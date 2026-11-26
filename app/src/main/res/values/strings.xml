@@ -1,0 +1,16 @@
+<resources>
+    <string name="app_name">JRS AI Guard</string>
+    <string name="developer_name">Md Jakariya Hasan</string>
+    <string name="official_website_cta">Official Website</string>
+    <string name="channel_alerts_name">Critical Security Alerts</string>
+    <string name="channel_alerts_desc">Screen-off camera/mic alerts, root access warnings, and malware flags</string>
+    <string name="channel_watchdog_name">Watchdog Monitor Service</string>
+    <string name="channel_watchdog_desc">Persistent status for active dual-mode hardware and permission watchdog</string>
+    <string name="channel_digest_name">AI Security Digests</string>
+    <string name="channel_digest_desc">Scheduled Gemini AI security summaries and audits</string>
+    <string name="nav_dashboard">Guard</string>
+    <string name="nav_timeline">Timeline</string>
+    <string name="nav_scanner">Scanner</string>
+    <string name="nav_network">Network</string>
+    <string name="nav_assistant">AI Chat</string>
+</resources>

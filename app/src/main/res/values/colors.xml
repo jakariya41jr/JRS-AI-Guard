@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="obsidian_bg">#FF05080F</color>
+    <color name="obsidian_surface">#FF0B1220</color>
+    <color name="neon_cyan">#FF00F0FF</color>
+    <color name="cyber_emerald">#FF00E676</color>
+    <color name="black">#FF000000</color>
+    <color name="white">#FFFFFFFF</color>
+</resources>
