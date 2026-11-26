@@ -1,8 +1,5 @@
 package com.example.data.local
 
-import androidx.room.Entity
-import androidx.room.PrimaryKey
-
 enum class EventCategory(val displayName: String) {
     PERMISSION("Permissions"),
     BACKGROUND_RESOURCE("Background & CPU"),
@@ -26,9 +23,8 @@ enum class TrustLevel(val label: String) {
     BLOCKED("Blocked")
 }
 
-@Entity(tableName = "timeline_events")
 data class TimelineEventEntity(
-    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    val id: Long = 0,
     val category: String,
     val packageName: String,
     val appName: String,
@@ -47,9 +43,8 @@ data class TimelineEventEntity(
     val encryptedExtra: String = ""
 )
 
-@Entity(tableName = "network_sessions")
 data class NetworkSessionEntity(
-    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    val id: Long = 0,
     val packageName: String,
     val appName: String,
     val uid: Int,
@@ -64,9 +59,8 @@ data class NetworkSessionEntity(
     val isBlocked: Boolean = false
 )
 
-@Entity(tableName = "app_trust")
 data class AppTrustEntity(
-    @PrimaryKey val packageName: String,
+    val packageName: String,
     val appName: String,
     val uid: Int,
     val trustLevel: String = TrustLevel.TRUSTED.name,
@@ -84,9 +78,8 @@ data class AppTrustEntity(
     val isSystemApp: Boolean = false
 )
 
-@Entity(tableName = "scan_cache")
 data class ScanCacheEntity(
-    @PrimaryKey val sha256: String,
+    val sha256: String,
     val targetName: String,
     val packageName: String = "",
     val fileSizeBytes: Long = 0L,
@@ -100,9 +93,8 @@ data class ScanCacheEntity(
     val expiresAtMs: Long
 )
 
-@Entity(tableName = "security_snapshots")
 data class SecuritySnapshotEntity(
-    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    val id: Long = 0,
     val capturedAtMs: Long,
     val triggerReason: String,
     val severity: String,
@@ -114,9 +106,8 @@ data class SecuritySnapshotEntity(
     val encryptedPayload: String
 )
 
-@Entity(tableName = "ai_insights")
 data class AiInsightEntity(
-    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    val id: Long = 0,
     val createdAtMs: Long,
     val scheduleType: String,
     val title: String,
@@ -125,9 +116,8 @@ data class AiInsightEntity(
     val quotaSavedNote: String
 )
 
-@Entity(tableName = "chat_messages")
 data class ChatMessageEntity(
-    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    val id: Long = 0,
     val timestampMs: Long,
     val isUser: Boolean,
     val messageText: String,

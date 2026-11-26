@@ -4,7 +4,7 @@ plugins {
   alias(libs.plugins.android.application)
   alias(libs.plugins.kotlin.compose)
   alias(libs.plugins.kotlin.serialization)
-  alias(libs.plugins.google.devtools.ksp)
+  // alias(libs.plugins.google.devtools.ksp)
   alias(libs.plugins.secrets)
   alias(libs.plugins.google.services)
 }
@@ -104,8 +104,8 @@ dependencies {
   implementation(libs.androidx.lifecycle.runtime.ktx)
   implementation(libs.androidx.lifecycle.viewmodel.compose)
   implementation(libs.androidx.navigation.compose)
-  implementation(libs.androidx.room.ktx)
-  implementation(libs.androidx.room.runtime)
+  // implementation(libs.androidx.room.ktx)
+  // implementation(libs.androidx.room.runtime)
   implementation(libs.androidx.work.runtime.ktx)
   // implementation(libs.coil.compose)
   // implementation(libs.converter.moshi)
@@ -142,23 +142,8 @@ dependencies {
   androidTestImplementation(libs.androidx.runner)
   debugImplementation(libs.androidx.compose.ui.test.manifest)
   debugImplementation(libs.androidx.compose.ui.tooling)
-  "ksp"(libs.androidx.room.compiler)
+  // "ksp"(libs.androidx.room.compiler)
   // "ksp"(libs.moshi.kotlin.codegen)
-}
-
-abstract class KspSerialExecutionService :
-  org.gradle.api.services.BuildService<org.gradle.api.services.BuildServiceParameters.None>
-
-val kspSerialExecutionService =
-  gradle.sharedServices.registerIfAbsent(
-    "kspSerialExecution",
-    KspSerialExecutionService::class.java,
-  ) {
-    maxParallelUsages.set(1)
-  }
-
-tasks.withType(com.google.devtools.ksp.gradle.KspAATask::class.java).configureEach {
-  usesService(kspSerialExecutionService)
 }
 
 tasks.matching { it.name == "validateSigningDebug" }.configureEach {
