@@ -188,12 +188,36 @@ class GuardRepository(private val context: Context) {
         return granted
     }
 
-    suspend fun saveGeminiKey(rawKey: String) {
+    suspend fun saveGeminiKey(
+        rawKey: String,
+        requestedModel: String,
+        customModelTyped: Boolean
+    ): com.example.data.ai.KeyValidationResult? {
         cryptoVault.saveGeminiApiKey(rawKey)
+        val trimmed = rawKey.trim()
+        if (trimmed.isEmpty()) return null
+        val result = if (customModelTyped && requestedModel.isNotBlank()) {
+            geminiClient.detectAndValidateKey(trimmed, requestedModel, customModelTyped = true)
+        } else {
+            geminiClient.detectBestAvailableModelOnly(trimmed, requestedModel)
+        }
+        if (result.resolvedModel.isNotBlank()) {
+            cryptoVault.updateGeminiModel(result.resolvedModel)
+        }
+        return result
     }
 
-    suspend fun testGeminiKey(rawKey: String, model: String): Pair<Boolean, String> {
-        return geminiClient.testApiKey(rawKey, model)
+    suspend fun testGeminiKey(
+        rawKey: String,
+        model: String,
+        customModelTyped: Boolean
+    ): com.example.data.ai.KeyValidationResult {
+        val effectiveKey = rawKey.trim().ifEmpty { cryptoVault.getGeminiApiKey().orEmpty() }
+        val result = geminiClient.detectAndValidateKey(effectiveKey, model, customModelTyped)
+        if (result.success && result.resolvedModel.isNotBlank()) {
+            cryptoVault.updateGeminiModel(result.resolvedModel)
+        }
+        return result
     }
 
     suspend fun updateAiSchedule(frequency: AiScheduleFrequency, eventTriggered: Boolean, model: String) {

@@ -7,6 +7,7 @@ import android.provider.Settings
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.data.GuardRepository
+import com.example.data.ai.KeyValidationResult
 import com.example.data.export.ExportFormat
 import com.example.data.github.GitHubReleaseInfo
 import com.example.data.local.AiInsightEntity
@@ -96,6 +97,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     private val _isAiBusy = MutableStateFlow(false)
     val isAiBusy: StateFlow<Boolean> = _isAiBusy.asStateFlow()
+
+    private val _keyValidationResult = MutableStateFlow<KeyValidationResult?>(null)
+    val keyValidationResult: StateFlow<KeyValidationResult?> = _keyValidationResult.asStateFlow()
 
     private val _githubRelease = MutableStateFlow<GitHubReleaseInfo?>(null)
     val githubRelease: StateFlow<GitHubReleaseInfo?> = _githubRelease.asStateFlow()
@@ -261,22 +265,24 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    fun saveGeminiKey(key: String) {
+    fun saveGeminiKey(key: String, requestedModel: String, customModelTyped: Boolean) {
         viewModelScope.launch {
-            repo.saveGeminiKey(key)
-            _uiEvents.emit(UiToastEvent.Message(
-                if (key.isBlank()) "Gemini API key cleared from encrypted vault"
-                else "Gemini API key encrypted & saved in Android Keystore vault"
-            ))
+            _isAiBusy.value = true
+            val result = repo.saveGeminiKey(key, requestedModel, customModelTyped)
+            _isAiBusy.value = false
+            _keyValidationResult.value = result
+            val msg = result?.statusMessage ?: "Gemini API key cleared from encrypted vault"
+            _uiEvents.emit(UiToastEvent.Message(msg))
         }
     }
 
-    fun testGeminiKey(rawKey: String, model: String) {
+    fun testGeminiKey(rawKey: String, model: String, customModelTyped: Boolean) {
         viewModelScope.launch {
             _isAiBusy.value = true
-            val (ok, msg) = repo.testGeminiKey(rawKey, model)
+            val result = repo.testGeminiKey(rawKey, model, customModelTyped)
             _isAiBusy.value = false
-            _uiEvents.emit(UiToastEvent.Message(if (ok) "Connected: $msg" else msg))
+            _keyValidationResult.value = result
+            _uiEvents.emit(UiToastEvent.Message(result.statusMessage))
         }
     }
 

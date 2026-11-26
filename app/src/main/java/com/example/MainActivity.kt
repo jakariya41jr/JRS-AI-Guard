@@ -142,6 +142,7 @@ private fun JrsAiGuardRootApp(
     val selectedCategory by viewModel.selectedCategoryFilter.collectAsStateWithLifecycle()
     val quickActionTarget by viewModel.quickActionTarget.collectAsStateWithLifecycle()
     val isAiBusy by viewModel.isAiBusy.collectAsStateWithLifecycle()
+    val keyValidationResult by viewModel.keyValidationResult.collectAsStateWithLifecycle()
     val githubRelease by viewModel.githubRelease.collectAsStateWithLifecycle()
     val isCheckingRelease by viewModel.isCheckingRelease.collectAsStateWithLifecycle()
 
@@ -381,6 +382,7 @@ private fun JrsAiGuardRootApp(
                                 chatMessages = chatMessages,
                                 aiInsights = aiInsights,
                                 isAiBusy = isAiBusy,
+                                keyValidationResult = keyValidationResult,
                                 githubRelease = githubRelease,
                                 isCheckingRelease = isCheckingRelease,
                                 onSendChat = viewModel::sendChatMessage,

@@ -69,6 +69,7 @@ import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.example.BuildConfig
+import com.example.data.ai.KeyValidationResult
 import com.example.data.github.GitHubReleaseInfo
 import com.example.data.local.AiInsightEntity
 import com.example.data.local.ChatMessageEntity
@@ -98,12 +99,13 @@ fun AiGuardScreen(
     chatMessages: List<ChatMessageEntity>,
     aiInsights: List<AiInsightEntity>,
     isAiBusy: Boolean,
+    keyValidationResult: KeyValidationResult?,
     githubRelease: GitHubReleaseInfo?,
     isCheckingRelease: Boolean,
     onSendChat: (String) -> Unit,
     onClearChat: () -> Unit,
-    onSaveGeminiKey: (String) -> Unit,
-    onTestGeminiKey: (String, String) -> Unit,
+    onSaveGeminiKey: (String, String, Boolean) -> Unit,
+    onTestGeminiKey: (String, String, Boolean) -> Unit,
     onUpdateSchedule: (AiScheduleFrequency, Boolean, String) -> Unit,
     onRunDigestNow: () -> Unit,
     onCheckGitHubRelease: (String, String) -> Unit,
@@ -155,6 +157,7 @@ fun AiGuardScreen(
                 vaultConfig = vaultConfig,
                 insights = aiInsights,
                 isBusy = isAiBusy,
+                keyValidationResult = keyValidationResult,
                 onSaveKey = onSaveGeminiKey,
                 onTestKey = onTestGeminiKey,
                 onUpdateSchedule = onUpdateSchedule,
@@ -357,16 +360,26 @@ private fun GeminiVaultAndScheduleTab(
     vaultConfig: VaultConfig,
     insights: List<AiInsightEntity>,
     isBusy: Boolean,
-    onSaveKey: (String) -> Unit,
-    onTestKey: (String, String) -> Unit,
+    keyValidationResult: KeyValidationResult?,
+    onSaveKey: (String, String, Boolean) -> Unit,
+    onTestKey: (String, String, Boolean) -> Unit,
     onUpdateSchedule: (AiScheduleFrequency, Boolean, String) -> Unit,
     onRunDigestNow: () -> Unit
 ) {
     var apiKeyInput by remember { mutableStateOf("") }
     var showKey by remember { mutableStateOf(false) }
     var modelInput by remember(vaultConfig.geminiModel) { mutableStateOf(vaultConfig.geminiModel) }
+    var isCustomModelEdited by remember(vaultConfig.geminiModel) { mutableStateOf(false) }
     var selectedFreq by remember(vaultConfig.scheduleFrequency) { mutableStateOf(vaultConfig.scheduleFrequency) }
     var eventTriggered by remember(vaultConfig.eventTriggeredEnabled) { mutableStateOf(vaultConfig.eventTriggeredEnabled) }
+
+    LaunchedEffect(keyValidationResult?.resolvedModel) {
+        val resolved = keyValidationResult?.resolvedModel
+        if (!resolved.isNullOrBlank()) {
+            modelInput = resolved
+            isCustomModelEdited = false
+        }
+    }
 
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
@@ -402,7 +415,7 @@ private fun GeminiVaultAndScheduleTab(
                     value = apiKeyInput,
                     onValueChange = { apiKeyInput = it },
                     label = { Text("Gemini API Key") },
-                    placeholder = { Text("AIza…") },
+                    placeholder = { Text(if (vaultConfig.hasGeminiKey) "Saved in vault (enter new key to replace)" else "AIza…") },
                     singleLine = true,
                     visualTransformation = if (showKey) VisualTransformation.None else PasswordVisualTransformation(),
                     trailingIcon = {
@@ -422,8 +435,11 @@ private fun GeminiVaultAndScheduleTab(
                 Spacer(Modifier.height(8.dp))
                 OutlinedTextField(
                     value = modelInput,
-                    onValueChange = { modelInput = it },
-                    label = { Text("Gemini Model ID") },
+                    onValueChange = {
+                        modelInput = it
+                        isCustomModelEdited = it.trim() != vaultConfig.geminiModel
+                    },
+                    label = { Text("Gemini Model ID (Auto-detected on Test/Save)") },
                     singleLine = true,
                     modifier = Modifier
                         .fillMaxWidth()
@@ -437,10 +453,10 @@ private fun GeminiVaultAndScheduleTab(
                 ) {
                     Button(
                         onClick = {
-                            onSaveKey(apiKeyInput)
+                            onSaveKey(apiKeyInput, modelInput, isCustomModelEdited)
                             apiKeyInput = ""
                         },
-                        enabled = apiKeyInput.isNotBlank(),
+                        enabled = apiKeyInput.isNotBlank() && !isBusy,
                         modifier = Modifier
                             .weight(1f)
                             .heightIn(min = 48.dp)
@@ -452,14 +468,61 @@ private fun GeminiVaultAndScheduleTab(
                         Text("Save Encrypted")
                     }
                     OutlinedButton(
-                        onClick = { onTestKey(apiKeyInput, modelInput) },
-                        enabled = apiKeyInput.isNotBlank() && !isBusy,
+                        onClick = { onTestKey(apiKeyInput, modelInput, isCustomModelEdited) },
+                        enabled = (apiKeyInput.isNotBlank() || vaultConfig.hasGeminiKey) && !isBusy,
                         modifier = Modifier
                             .weight(1f)
                             .heightIn(min = 48.dp)
                             .testTag("test_gemini_key_button")
                     ) {
                         Text("Test Key", color = CyberEmerald)
+                    }
+                }
+
+                if (isBusy) {
+                    Spacer(Modifier.height(10.dp))
+                    LinearProgressIndicator(modifier = Modifier.fillMaxWidth(), color = NeonCyan)
+                }
+
+                if (keyValidationResult != null) {
+                    Spacer(Modifier.height(10.dp))
+                    val statusColor = when {
+                        keyValidationResult.fellBackFromCustom && keyValidationResult.success -> AmberPulse
+                        keyValidationResult.success -> CyberEmerald
+                        else -> AlertCrimson
+                    }
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(statusColor.copy(alpha = 0.12f))
+                            .padding(10.dp)
+                            .testTag("gemini_key_status_banner")
+                    ) {
+                        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    text = if (keyValidationResult.success) "Connection Verified" else "Validation Notice",
+                                    style = MaterialTheme.typography.labelLarge,
+                                    color = statusColor
+                                )
+                                if (keyValidationResult.resolvedModel.isNotBlank()) {
+                                    NeonBadge(
+                                        text = keyValidationResult.resolvedModel,
+                                        color = statusColor
+                                    )
+                                }
+                            }
+                            Text(
+                                text = keyValidationResult.statusMessage,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = TextPrimary
+                            )
+                        }
                     }
                 }
             }

@@ -16,12 +16,23 @@ import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 import org.json.JSONArray
 import org.json.JSONObject
+import java.net.URLEncoder
 import java.util.concurrent.TimeUnit
 
 data class GeminiResponseResult(
     val success: Boolean,
     val text: String,
-    val isRefusal: Boolean = false
+    val isRefusal: Boolean = false,
+    val httpCode: Int = 0
+)
+
+data class KeyValidationResult(
+    val success: Boolean,
+    val resolvedModel: String,
+    val availableModelsCount: Int = 0,
+    val autoDetected: Boolean = false,
+    val fellBackFromCustom: Boolean = false,
+    val statusMessage: String
 )
 
 class GeminiClient(private val cryptoVault: CryptoVault) {
@@ -32,6 +43,8 @@ class GeminiClient(private val cryptoVault: CryptoVault) {
         .build()
 
     companion object {
+        const val DEFAULT_MODEL = "gemini-2.5-flash"
+
         private val STRICT_SYSTEM_INSTRUCTION = """
             You are the official in-app security assistant for "JRS AI Guard" (Android package: ${BuildConfig.APPLICATION_ID}).
             CREATOR RULE: If the user asks who created, built, owns, or developed you or JRS AI Guard, you MUST clearly state that "Md Jakariya Hasan" created JRS AI Guard and this AI assistant.
@@ -55,6 +68,48 @@ class GeminiClient(private val cryptoVault: CryptoVault) {
             "alert", "timeline", "gallery", "exfil", "sensor", "wake", "security", "privacy",
             "app", "monitor", "watchdog", "log", "freeze", "threat", "help", "feature", "status"
         )
+
+        fun selectPreferredModel(models: List<String>): String? {
+            if (models.isEmpty()) return null
+            val cleanCandidates = models
+                .map { it.removePrefix("models/").trim() }
+                .filter { it.contains("gemini", ignoreCase = true) }
+                .filterNot {
+                    val low = it.lowercase()
+                    low.contains("embedding") ||
+                        low.contains("imagen") ||
+                        low.contains("veo") ||
+                        low.contains("aqa") ||
+                        low.contains("tts") ||
+                        low.contains("robotics") ||
+                        low.contains("native-audio")
+                }
+                .distinct()
+
+            val pool = cleanCandidates.ifEmpty { models.map { it.removePrefix("models/").trim() }.distinct() }
+            return pool.maxWithOrNull(compareBy<String>(
+                { model -> if (model.contains("flash", ignoreCase = true)) 1 else 0 },
+                { model -> parseGeminiVersionScore(model) },
+                { model ->
+                    val low = model.lowercase()
+                    when {
+                        low.endsWith("-flash") -> 4
+                        low.contains("flash") && !low.contains("lite") && !low.contains("exp") && !low.contains("preview") && !low.contains("8b") -> 3
+                        low.contains("flash-lite") -> 2
+                        !low.contains("exp") && !low.contains("preview") -> 1
+                        else -> 0
+                    }
+                },
+                { model -> -model.length }
+            ))
+        }
+
+        private fun parseGeminiVersionScore(modelId: String): Int {
+            val match = Regex("""gemini-(\d+)(?:\.(\d+))?""", RegexOption.IGNORE_CASE).find(modelId)
+            val major = match?.groupValues?.getOrNull(1)?.toIntOrNull() ?: 0
+            val minor = match?.groupValues?.getOrNull(2)?.toIntOrNull() ?: 0
+            return major * 100 + minor
+        }
     }
 
     fun buildPrivacyFilteredSummary(
@@ -96,7 +151,6 @@ class GeminiClient(private val cryptoVault: CryptoVault) {
     ): GeminiResponseResult = withContext(Dispatchers.IO) {
         val lower = userMessage.lowercase()
 
-        // Deterministic creator guard
         if (CREATOR_PATTERNS.any { lower.contains(it) }) {
             return@withContext GeminiResponseResult(
                 success = true,
@@ -104,7 +158,6 @@ class GeminiClient(private val cryptoVault: CryptoVault) {
             )
         }
 
-        // Local fast-refusal guard to conserve free Gemini API quota on obviously off-topic prompts
         val looksOnTopic = ON_TOPIC_HINTS.any { lower.contains(it) }
         if (!looksOnTopic && userMessage.length > 10) {
             return@withContext GeminiResponseResult(
@@ -118,7 +171,7 @@ class GeminiClient(private val cryptoVault: CryptoVault) {
         if (apiKey.isNullOrBlank()) {
             return@withContext GeminiResponseResult(
                 success = false,
-                text = "No Gemini API key is configured in your encrypted local vault yet. Open the AI Digests & Schedule tab to save your own Gemini API key securely, or review your local telemetry above."
+                text = "No Gemini API key is configured in your encrypted local vault yet. Open the Vault & Schedule tab to save your own Gemini API key securely."
             )
         }
 
@@ -130,7 +183,7 @@ class GeminiClient(private val cryptoVault: CryptoVault) {
             $userMessage
         """.trimIndent()
 
-        callGeminiGenerateContent(apiKey, model, promptWithContext)
+        callWithAutoFallback(apiKey, model, promptWithContext)
     }
 
     suspend fun generateScheduledDigest(
@@ -150,16 +203,232 @@ class GeminiClient(private val cryptoVault: CryptoVault) {
             $privacySummary
         """.trimIndent()
 
-        callGeminiGenerateContent(apiKey, model, prompt)
+        callWithAutoFallback(apiKey, model, prompt)
     }
 
-    suspend fun testApiKey(rawKey: String, model: String): Pair<Boolean, String> = withContext(Dispatchers.IO) {
-        val res = callGeminiGenerateContent(
-            apiKey = rawKey.trim(),
-            model = model.ifBlank { "gemini-2.5-flash" },
-            userPrompt = "Reply in one short sentence confirming JRS AI Guard created by Md Jakariya Hasan is connected."
-        )
-        res.success to res.text
+    suspend fun detectAndValidateKey(
+        rawKey: String,
+        requestedModel: String,
+        customModelTyped: Boolean
+    ): KeyValidationResult = withContext(Dispatchers.IO) {
+        val apiKey = rawKey.trim()
+        if (apiKey.isEmpty()) {
+            return@withContext KeyValidationResult(
+                success = false,
+                resolvedModel = requestedModel.ifBlank { DEFAULT_MODEL },
+                statusMessage = "Enter a Gemini API key first."
+            )
+        }
+
+        val testPrompt = "Reply in one short sentence confirming JRS AI Guard created by Md Jakariya Hasan is connected."
+        val cleanedRequested = requestedModel.trim().removePrefix("models/")
+
+        // If user manually typed a custom model ID, test that model first
+        if (customModelTyped && cleanedRequested.isNotEmpty()) {
+            val directRes = callGeminiGenerateContent(apiKey, cleanedRequested, testPrompt)
+            if (directRes.success) {
+                return@withContext KeyValidationResult(
+                    success = true,
+                    resolvedModel = cleanedRequested,
+                    autoDetected = false,
+                    fellBackFromCustom = false,
+                    statusMessage = "Test Key succeeded with custom model '$cleanedRequested': ${directRes.text}"
+                )
+            }
+
+            if (!isModelNotFoundError(directRes)) {
+                return@withContext KeyValidationResult(
+                    success = false,
+                    resolvedModel = cleanedRequested,
+                    statusMessage = "Test Key failed on '$cleanedRequested': ${directRes.text}"
+                )
+            }
+
+            // Custom model returned 404 / unsupported -> query ListModels and fall back automatically
+            val listed = fetchGenerateContentModels(apiKey)
+            val available = listed.getOrNull().orEmpty()
+            val fallback = selectPreferredModel(available.filterNot { it.equals(cleanedRequested, ignoreCase = true) })
+                ?: selectPreferredModel(available)
+
+            if (fallback == null) {
+                return@withContext KeyValidationResult(
+                    success = false,
+                    resolvedModel = cleanedRequested,
+                    statusMessage = "Custom model '$cleanedRequested' returned 404, and ListModels found no generateContent fallback (${listed.exceptionOrNull()?.message ?: "no models"})."
+                )
+            }
+
+            val fallbackRes = callGeminiGenerateContent(apiKey, fallback, testPrompt)
+            return@withContext if (fallbackRes.success) {
+                KeyValidationResult(
+                    success = true,
+                    resolvedModel = fallback,
+                    availableModelsCount = available.size,
+                    autoDetected = true,
+                    fellBackFromCustom = true,
+                    statusMessage = "Custom model '$cleanedRequested' returned 404 (not found). Auto-switched to working model '$fallback' (${available.size} models detected)."
+                )
+            } else {
+                KeyValidationResult(
+                    success = false,
+                    resolvedModel = fallback,
+                    availableModelsCount = available.size,
+                    statusMessage = "Custom '$cleanedRequested' (404) and fallback '$fallback' failed: ${fallbackRes.text}"
+                )
+            }
+        }
+
+        // Auto-detect via ListModels endpoint and prioritize newest Flash model
+        val listed = fetchGenerateContentModels(apiKey)
+        val available = listed.getOrNull().orEmpty()
+        val detectedModel = selectPreferredModel(available)
+
+        if (detectedModel == null) {
+            val fallbackCandidate = cleanedRequested.ifEmpty { DEFAULT_MODEL }
+            val fallbackRes = callGeminiGenerateContent(apiKey, fallbackCandidate, testPrompt)
+            return@withContext if (fallbackRes.success) {
+                KeyValidationResult(
+                    success = true,
+                    resolvedModel = fallbackCandidate,
+                    autoDetected = false,
+                    statusMessage = "Connected using '$fallbackCandidate': ${fallbackRes.text}"
+                )
+            } else {
+                val reason = listed.exceptionOrNull()?.message ?: fallbackRes.text
+                KeyValidationResult(
+                    success = false,
+                    resolvedModel = fallbackCandidate,
+                    statusMessage = "Model detection failed: $reason"
+                )
+            }
+        }
+
+        val verifyRes = callGeminiGenerateContent(apiKey, detectedModel, testPrompt)
+        return@withContext if (verifyRes.success) {
+            KeyValidationResult(
+                success = true,
+                resolvedModel = detectedModel,
+                availableModelsCount = available.size,
+                autoDetected = true,
+                statusMessage = "Auto-detected working model '$detectedModel' (${available.size} generateContent models available). Test Key passed."
+            )
+        } else {
+            // Try next non-failing candidate from ListModels if top pick errored with 404
+            val secondBest = if (isModelNotFoundError(verifyRes)) {
+                selectPreferredModel(available.filterNot { it.equals(detectedModel, ignoreCase = true) })
+            } else null
+
+            if (secondBest != null) {
+                val secondRes = callGeminiGenerateContent(apiKey, secondBest, testPrompt)
+                if (secondRes.success) {
+                    return@withContext KeyValidationResult(
+                        success = true,
+                        resolvedModel = secondBest,
+                        availableModelsCount = available.size,
+                        autoDetected = true,
+                        statusMessage = "Auto-detected working model '$secondBest' (${available.size} models available). Test Key passed."
+                    )
+                }
+            }
+
+            KeyValidationResult(
+                success = false,
+                resolvedModel = detectedModel,
+                availableModelsCount = available.size,
+                autoDetected = true,
+                statusMessage = "Detected '$detectedModel', but Test Key failed: ${verifyRes.text}"
+            )
+        }
+    }
+
+    suspend fun detectBestAvailableModelOnly(rawKey: String, currentModel: String): KeyValidationResult =
+        withContext(Dispatchers.IO) {
+            val apiKey = rawKey.trim()
+            val listed = fetchGenerateContentModels(apiKey)
+            val available = listed.getOrNull().orEmpty()
+            val best = selectPreferredModel(available)
+            if (best != null) {
+                KeyValidationResult(
+                    success = true,
+                    resolvedModel = best,
+                    availableModelsCount = available.size,
+                    autoDetected = true,
+                    statusMessage = "Encrypted key saved & auto-selected '$best' (${available.size} available models)."
+                )
+            } else {
+                KeyValidationResult(
+                    success = false,
+                    resolvedModel = currentModel.ifBlank { DEFAULT_MODEL },
+                    statusMessage = "Encrypted key saved locally. Could not auto-detect models (${listed.exceptionOrNull()?.message ?: "offline"})."
+                )
+            }
+        }
+
+    fun fetchGenerateContentModels(apiKey: String): Result<List<String>> {
+        val encodedKey = URLEncoder.encode(apiKey.trim(), "UTF-8")
+        val url = "https://generativelanguage.googleapis.com/v1beta/models?key=$encodedKey"
+        return runCatching {
+            val req = Request.Builder()
+                .url(url)
+                .get()
+                .build()
+            httpClient.newCall(req).execute().use { resp ->
+                val body = resp.body?.string().orEmpty()
+                if (!resp.isSuccessful) {
+                    val errMsg = runCatching {
+                        JSONObject(body).optJSONObject("error")?.optString("message")
+                    }.getOrNull().orEmpty().ifEmpty { "HTTP ${resp.code}" }
+                    throw IllegalStateException(errMsg)
+                }
+                val json = JSONObject(body)
+                val modelsArr = json.optJSONArray("models") ?: return@use emptyList()
+                val supported = mutableListOf<String>()
+                for (i in 0 until modelsArr.length()) {
+                    val obj = modelsArr.optJSONObject(i) ?: continue
+                    val methods = obj.optJSONArray("supportedGenerationMethods") ?: continue
+                    var supportsGenerate = false
+                    for (m in 0 until methods.length()) {
+                        if (methods.optString(m) == "generateContent") {
+                            supportsGenerate = true
+                            break
+                        }
+                    }
+                    if (supportsGenerate) {
+                        val name = obj.optString("name").removePrefix("models/").trim()
+                        if (name.isNotEmpty()) supported += name
+                    }
+                }
+                supported
+            }
+        }
+    }
+
+    private suspend fun callWithAutoFallback(
+        apiKey: String,
+        model: String,
+        prompt: String
+    ): GeminiResponseResult {
+        val primary = model.ifBlank { DEFAULT_MODEL }.removePrefix("models/")
+        val firstRes = callGeminiGenerateContent(apiKey, primary, prompt)
+        if (firstRes.success || !isModelNotFoundError(firstRes)) {
+            return firstRes
+        }
+        val available = fetchGenerateContentModels(apiKey).getOrNull().orEmpty()
+        val fallback = selectPreferredModel(available.filterNot { it.equals(primary, ignoreCase = true) })
+            ?: return firstRes
+        val retryRes = callGeminiGenerateContent(apiKey, fallback, prompt)
+        if (retryRes.success) {
+            cryptoVault.updateGeminiModel(fallback)
+        }
+        return retryRes
+    }
+
+    private fun isModelNotFoundError(res: GeminiResponseResult): Boolean {
+        if (res.httpCode == 404) return true
+        val lower = res.text.lowercase()
+        return lower.contains("404") ||
+            lower.contains("not found") ||
+            lower.contains("not supported for generatecontent")
     }
 
     private fun callGeminiGenerateContent(
@@ -167,7 +436,9 @@ class GeminiClient(private val cryptoVault: CryptoVault) {
         model: String,
         userPrompt: String
     ): GeminiResponseResult {
-        val safeModel = model.ifBlank { "gemini-2.5-flash" }.replace(Regex("[^a-zA-Z0-9._-]"), "")
+        val safeModel = model.ifBlank { DEFAULT_MODEL }
+            .removePrefix("models/")
+            .replace(Regex("[^a-zA-Z0-9._-]"), "")
         val url = "https://generativelanguage.googleapis.com/v1beta/models/$safeModel:generateContent"
 
         val payload = JSONObject().apply {
@@ -204,7 +475,11 @@ class GeminiClient(private val cryptoVault: CryptoVault) {
                     val errMsg = runCatching {
                         JSONObject(body).optJSONObject("error")?.optString("message")
                     }.getOrNull().orEmpty().ifEmpty { "HTTP ${resp.code}" }
-                    return GeminiResponseResult(false, "Gemini API error: $errMsg")
+                    return GeminiResponseResult(
+                        success = false,
+                        text = "Gemini API error (${resp.code}): $errMsg",
+                        httpCode = resp.code
+                    )
                 }
                 val json = JSONObject(body)
                 val candidates = json.optJSONArray("candidates")
@@ -217,9 +492,9 @@ class GeminiClient(private val cryptoVault: CryptoVault) {
                     .trim()
 
                 if (text.isEmpty()) {
-                    GeminiResponseResult(false, "Gemini returned an empty response.")
+                    GeminiResponseResult(false, "Gemini returned an empty response.", httpCode = resp.code)
                 } else {
-                    GeminiResponseResult(true, text)
+                    GeminiResponseResult(true, text, httpCode = resp.code)
                 }
             }
         }.getOrElse { ex ->

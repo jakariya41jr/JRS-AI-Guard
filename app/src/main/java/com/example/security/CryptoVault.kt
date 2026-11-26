@@ -112,6 +112,14 @@ class CryptoVault(private val context: Context) {
         }
     }
 
+    suspend fun updateGeminiModel(model: String) {
+        val cleaned = model.trim()
+        if (cleaned.isEmpty()) return
+        context.vaultDataStore.edit { prefs ->
+            prefs[KEY_GEMINI_MODEL] = cleaned
+        }
+    }
+
     suspend fun updateWatchdogSettings(
         watchdogEnabled: Boolean,
         screenOffAlert: Boolean,

@@ -2,5 +2,7 @@
   "name": "JRS AI Guard",
   "description": "Android security, system watchdog, and AI monitoring suite for Rooted and Non-Rooted devices by Md Jakariya Hasan.",
   "requestFramePermissions": [],
-  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
 }
