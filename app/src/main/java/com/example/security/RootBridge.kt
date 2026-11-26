@@ -24,13 +24,23 @@ data class RootEnvironmentStatus(
     val suGrantVerified: Boolean,
     val magiskOrKernelSuDetected: Boolean,
     val selinuxStatus: String,
-    val uidOutput: String
+    val uidOutput: String,
+    val rootManagerName: String = "None",
+    val rootManagerVersion: String = "",
+    val moduleCount: Int = 0,
+    val verifiedBootState: String = "unknown"
 )
 
 data class RootActionResult(
     val success: Boolean,
     val executedViaRoot: Boolean,
     val message: String
+)
+
+data class RootAppOpEntry(
+    val packageName: String,
+    val operation: String,
+    val detail: String
 )
 
 class RootBridge {
@@ -52,17 +62,51 @@ class RootBridge {
 
     suspend fun inspectEnvironment(): RootEnvironmentStatus = withContext(Dispatchers.IO) {
         val foundSu = SU_PATHS.firstOrNull { File(it).exists() }
-        val magiskFound = File("/data/adb/magisk").exists() ||
-            File("/data/adb/ksu").exists() ||
+        val isKsu = File("/data/adb/ksu").exists() || File("/data/adb/ksud").exists()
+        val isApatch = File("/data/adb/ap").exists()
+        val isMagisk = File("/data/adb/magisk").exists() ||
             File("/sbin/.magisk").exists() ||
             File("/debug_ramdisk/.magisk").exists()
+        val magiskFound = isMagisk || isKsu || isApatch
 
-        val idCheck = runSuCommandInternal("id", timeoutSeconds = 2)
+        val idCheck = runSuCommandInternal("id", timeoutSeconds = 3)
         val suVerified = idCheck.first && idCheck.second.contains("uid=0")
 
         val selinux = readSysFile("/sys/fs/selinux/enforce")?.let {
             if (it.trim() == "1") "Enforcing" else "Permissive"
-        } ?: runCommandDirect(listOf("getenforce")).second.trim().ifEmpty { "Restricted" }
+        } ?: run {
+            if (suVerified) {
+                runSuCommandInternal("getenforce", 2).second.trim().ifEmpty { "Restricted" }
+            } else {
+                runCommandDirect(listOf("getenforce")).second.trim().ifEmpty { "Restricted" }
+            }
+        }
+
+        val managerName = when {
+            isKsu -> "KernelSU"
+            isApatch -> "APatch"
+            isMagisk -> "Magisk"
+            suVerified || foundSu != null -> "su Binary"
+            else -> "None"
+        }
+
+        var managerVersion = ""
+        var moduleCount = 0
+        var bootState = runCommandDirect(listOf("getprop", "ro.boot.verifiedbootstate")).second.trim()
+
+        if (suVerified) {
+            val verRes = runSuCommandInternal("magisk -v 2>/dev/null || ksud -V 2>/dev/null || apd -V 2>/dev/null", 2)
+            if (verRes.first) {
+                managerVersion = verRes.second.trim().lines().firstOrNull().orEmpty()
+            }
+            val modRes = runSuCommandInternal("ls -1 /data/adb/modules 2>/dev/null", 2)
+            if (modRes.first) {
+                moduleCount = modRes.second.lines().count { it.isNotBlank() }
+            }
+            if (bootState.isBlank()) {
+                bootState = runSuCommandInternal("getprop ro.boot.verifiedbootstate", 2).second.trim()
+            }
+        }
 
         val mode = when {
             suVerified -> GuardOperatingMode.ROOTED_ACTIVE
@@ -77,9 +121,15 @@ class RootBridge {
             suGrantVerified = suVerified,
             magiskOrKernelSuDetected = magiskFound,
             selinuxStatus = selinux,
-            uidOutput = idCheck.second.trim().ifEmpty { "uid=${android.os.Process.myUid()}" }
+            uidOutput = idCheck.second.trim().ifEmpty { "uid=${android.os.Process.myUid()}" },
+            rootManagerName = managerName,
+            rootManagerVersion = managerVersion,
+            moduleCount = moduleCount,
+            verifiedBootState = bootState.ifEmpty { "restricted" }
         )
     }
+
+    suspend fun requestAndVerifyRootGrant(): RootEnvironmentStatus = inspectEnvironment()
 
     suspend fun forceStopPackage(context: Context, packageName: String, isRootGranted: Boolean): RootActionResult {
         if (!isValidPackage(packageName)) {
@@ -120,7 +170,7 @@ class RootBridge {
         return RootActionResult(
             success = true,
             executedViaRoot = false,
-            message = "Non-root mode: Opened App Info for $packageName (Freeze requires root; marked in local Watchlist/Blocked)"
+            message = "Non-root mode: Opened App Info for $packageName (Freeze requires root; marked in Watchlist/Blocked)"
         )
     }
 
@@ -162,7 +212,7 @@ class RootBridge {
         }
         if (isRootGranted) {
             val policyCmd = if (block) {
-                "cmd netpolicy add restrict-background-blacklist $uid"
+                "cmd netpolicy add restrict-background-blacklist $uid && cmd netpolicy set restrict-background true"
             } else {
                 "cmd netpolicy remove restrict-background-blacklist $uid"
             }
@@ -186,16 +236,66 @@ class RootBridge {
     suspend fun readRootActiveConnections(): List<String> = withContext(Dispatchers.IO) {
         val res = runSuCommandInternal("ss -tunap 2>/dev/null || netstat -tupn 2>/dev/null", 3)
         if (!res.first) return@withContext emptyList()
-        res.second.lines().filter { it.isNotBlank() }.take(40)
+        res.second.lines().filter { it.isNotBlank() && !it.startsWith("Netid") }.take(40)
     }
 
     suspend fun readRootSuAccessLogs(): List<String> = withContext(Dispatchers.IO) {
         val res = runSuCommandInternal(
-            "logcat -d -t 40 -s Magisk:I su:I KernelSU:I 2>/dev/null",
+            "logcat -d -t 40 -s Magisk:I su:I KernelSU:I APatch:I 2>/dev/null",
             3
         )
         if (!res.first) return@withContext emptyList()
-        res.second.lines().filter { it.isNotBlank() }.take(25)
+        res.second.lines().filter { it.isNotBlank() && !it.startsWith("---------") }.take(25)
+    }
+
+    suspend fun readRootAppOpsSensorLogs(): List<RootAppOpEntry> = withContext(Dispatchers.IO) {
+        val ops = listOf("CAMERA", "RECORD_AUDIO", "FINE_LOCATION", "READ_CLIPBOARD")
+        val cmd = "dumpsys appops | grep -E 'Package |CAMERA|RECORD_AUDIO|FINE_LOCATION|READ_CLIPBOARD' | head -n 120"
+        val res = runSuCommandInternal(cmd, 4)
+        if (!res.first) return@withContext emptyList()
+
+        val entries = mutableListOf<RootAppOpEntry>()
+        var currentPkg = ""
+        for (line in res.second.lines()) {
+            val trimmed = line.trim()
+            if (trimmed.startsWith("Package ")) {
+                currentPkg = trimmed.removePrefix("Package ").substringBefore(":").substringBefore(" ").trim()
+            } else if (currentPkg.isNotBlank() && currentPkg != "android" && ops.any { trimmed.startsWith(it) }) {
+                val opName = ops.first { trimmed.startsWith(it) }
+                if (trimmed.contains("Access:") || trimmed.contains("Running:") || trimmed.contains("allow")) {
+                    entries += RootAppOpEntry(
+                        packageName = currentPkg,
+                        operation = opName,
+                        detail = trimmed.take(140)
+                    )
+                }
+            }
+            if (entries.size >= 20) break
+        }
+        entries
+    }
+
+    suspend fun readRootActiveSensorClients(): List<String> = withContext(Dispatchers.IO) {
+        val res = runSuCommandInternal("dumpsys sensorservice | grep -iE 'active|connection|package=' | head -n 20", 3)
+        if (!res.first) return@withContext emptyList()
+        res.second.lines().map { it.trim() }.filter { it.isNotBlank() }.take(12)
+    }
+
+    suspend fun readRootTopProcesses(): List<String> = withContext(Dispatchers.IO) {
+        val res = runSuCommandInternal("top -n 1 -b -m 6 2>/dev/null | tail -n 8", 3)
+        if (!res.first) return@withContext emptyList()
+        res.second.lines().map { it.trim() }.filter { it.isNotBlank() }.take(8)
+    }
+
+    suspend fun readRootModuleNames(): List<String> = withContext(Dispatchers.IO) {
+        val res = runSuCommandInternal("ls -1 /data/adb/modules 2>/dev/null", 2)
+        if (!res.first) return@withContext emptyList()
+        res.second.lines().map { it.trim() }.filter { it.isNotBlank() }.take(20)
+    }
+
+    suspend fun checkHostsFileCustomEntries(): Int = withContext(Dispatchers.IO) {
+        val res = runSuCommandInternal("grep -v '^#' /system/etc/hosts | grep -v '^$' | wc -l", 2)
+        res.second.trim().toIntOrNull() ?: 0
     }
 
     suspend fun computeRootSystemFileHash(path: String): String? = withContext(Dispatchers.IO) {

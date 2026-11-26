@@ -25,7 +25,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.AutoAwesome
@@ -59,6 +58,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
@@ -79,17 +79,14 @@ import com.example.ui.MainViewModel
 import com.example.ui.UiToastEvent
 import com.example.ui.components.JrsShieldLogo
 import com.example.ui.components.QuickActionControlSheet
+import com.example.ui.components.RootGrantCelebrationOverlay
 import com.example.ui.screens.AiGuardScreen
 import com.example.ui.screens.DashboardScreen
 import com.example.ui.screens.NetworkScreen
 import com.example.ui.screens.ScannerAuditScreen
 import com.example.ui.screens.TimelineScreen
 import com.example.ui.theme.JrsAiGuardTheme
-import com.example.ui.theme.NeonCyan
-import com.example.ui.theme.ObsidianDeep
-import com.example.ui.theme.ObsidianVoid
-import com.example.ui.theme.TextPrimary
-import com.example.ui.theme.TextSecondary
+import com.example.ui.theme.LocalJrsPalette
 import kotlinx.coroutines.delay
 import kotlinx.serialization.Serializable
 
@@ -112,8 +109,10 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         setContent {
-            JrsAiGuardTheme {
-                JrsAiGuardRootApp()
+            val viewModel: MainViewModel = viewModel()
+            val vaultConfig by viewModel.vaultConfig.collectAsStateWithLifecycle()
+            JrsAiGuardTheme(themeMode = vaultConfig.themeMode) {
+                JrsAiGuardRootApp(viewModel = viewModel)
             }
         }
     }
@@ -121,9 +120,10 @@ class MainActivity : ComponentActivity() {
 
 @Composable
 private fun JrsAiGuardRootApp(
-    viewModel: MainViewModel = viewModel()
+    viewModel: MainViewModel
 ) {
     val context = LocalContext.current
+    val palette = LocalJrsPalette.current
     val navController = rememberNavController()
     val snackbarHostState = remember { SnackbarHostState() }
 
@@ -145,6 +145,7 @@ private fun JrsAiGuardRootApp(
     val keyValidationResult by viewModel.keyValidationResult.collectAsStateWithLifecycle()
     val githubRelease by viewModel.githubRelease.collectAsStateWithLifecycle()
     val isCheckingRelease by viewModel.isCheckingRelease.collectAsStateWithLifecycle()
+    val showRootGrantOverlay by viewModel.showRootGrantAnimation.collectAsStateWithLifecycle()
 
     var showSplash by remember { mutableStateOf(true) }
     var pendingExport by remember { mutableStateOf<Pair<ExportFormat, String>?>(null) }
@@ -168,7 +169,7 @@ private fun JrsAiGuardRootApp(
     ) { /* handled gracefully */ }
 
     LaunchedEffect(Unit) {
-        delay(950)
+        delay(850)
         showSplash = false
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             val granted = ContextCompat.checkSelfPermission(
@@ -227,20 +228,20 @@ private fun JrsAiGuardRootApp(
         modifier = Modifier
             .fillMaxSize()
             .background(
-                Brush.verticalGradient(listOf(ObsidianVoid, ObsidianDeep, ObsidianVoid))
+                Brush.verticalGradient(listOf(palette.bgTop, palette.bgBottom, palette.bgTop))
             )
     ) {
         BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
             val useRail = maxWidth >= 700.dp
 
             Scaffold(
-                containerColor = androidx.compose.ui.graphics.Color.Transparent,
+                containerColor = Color.Transparent,
                 contentWindowInsets = WindowInsets.safeDrawing,
                 snackbarHost = { SnackbarHost(snackbarHostState) },
                 bottomBar = {
                     if (!useRail) {
                         NavigationBar(
-                            containerColor = ObsidianDeep.copy(alpha = 0.96f),
+                            containerColor = palette.navBar,
                             windowInsets = WindowInsets.navigationBars
                         ) {
                             destinations.forEach { dest ->
@@ -256,11 +257,11 @@ private fun JrsAiGuardRootApp(
                                     },
                                     label = { Text(dest.label, maxLines = 1) },
                                     colors = NavigationBarItemDefaults.colors(
-                                        selectedIconColor = NeonCyan,
-                                        selectedTextColor = NeonCyan,
-                                        indicatorColor = NeonCyan.copy(alpha = 0.16f),
-                                        unselectedIconColor = TextSecondary,
-                                        unselectedTextColor = TextSecondary
+                                        selectedIconColor = palette.cyan,
+                                        selectedTextColor = palette.cyan,
+                                        indicatorColor = palette.cyan.copy(alpha = 0.16f),
+                                        unselectedIconColor = palette.textSecondary,
+                                        unselectedTextColor = palette.textSecondary
                                     ),
                                     modifier = Modifier.testTag(dest.tag)
                                 )
@@ -276,7 +277,7 @@ private fun JrsAiGuardRootApp(
                 ) {
                     if (useRail) {
                         NavigationRail(
-                            containerColor = ObsidianDeep.copy(alpha = 0.95f),
+                            containerColor = palette.navBar,
                             modifier = Modifier.fillMaxHeight()
                         ) {
                             Spacer(Modifier.height(12.dp))
@@ -295,11 +296,11 @@ private fun JrsAiGuardRootApp(
                                     },
                                     label = { Text(dest.label) },
                                     colors = NavigationRailItemDefaults.colors(
-                                        selectedIconColor = NeonCyan,
-                                        selectedTextColor = NeonCyan,
-                                        indicatorColor = NeonCyan.copy(alpha = 0.16f),
-                                        unselectedIconColor = TextSecondary,
-                                        unselectedTextColor = TextSecondary
+                                        selectedIconColor = palette.cyan,
+                                        selectedTextColor = palette.cyan,
+                                        indicatorColor = palette.cyan.copy(alpha = 0.16f),
+                                        unselectedIconColor = palette.textSecondary,
+                                        unselectedTextColor = palette.textSecondary
                                     ),
                                     modifier = Modifier.testTag(dest.tag)
                                 )
@@ -321,6 +322,8 @@ private fun JrsAiGuardRootApp(
                                 networkSessions = networkSessions,
                                 isRefreshing = isRefreshing,
                                 onRefresh = viewModel::refreshAll,
+                                onVerifyRoot = viewModel::verifyAndActivateRoot,
+                                onCycleThemeMode = viewModel::cycleThemeMode,
                                 onToggleWatchdog = { enabled ->
                                     viewModel.toggleWatchdog(
                                         enabled,
@@ -391,6 +394,7 @@ private fun JrsAiGuardRootApp(
                                 onTestGeminiKey = viewModel::testGeminiKey,
                                 onUpdateSchedule = viewModel::updateAiSchedule,
                                 onRunDigestNow = viewModel::runAiDigestNow,
+                                onSetThemeMode = viewModel::setThemeMode,
                                 onCheckGitHubRelease = viewModel::checkGitHubRelease,
                                 onDownloadReleaseApk = viewModel::downloadReleaseApk,
                                 onOpenOfficialWebsite = viewModel::openOfficialWebsite
@@ -414,6 +418,13 @@ private fun JrsAiGuardRootApp(
             )
         }
 
+        RootGrantCelebrationOverlay(
+            visible = showRootGrantOverlay && !showSplash,
+            rootManagerName = integrityReport?.rootStatus?.rootManagerName ?: "Root Shell",
+            uidOutput = integrityReport?.rootStatus?.uidOutput ?: "uid=0(root)",
+            onDismiss = viewModel::dismissRootGrantAnimation
+        )
+
         AnimatedVisibility(
             visible = showSplash,
             exit = fadeOut()
@@ -421,7 +432,7 @@ private fun JrsAiGuardRootApp(
             Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .background(ObsidianVoid)
+                    .background(palette.bgTop)
                     .windowInsetsPadding(WindowInsets.safeDrawing),
                 contentAlignment = Alignment.Center
             ) {
@@ -433,13 +444,13 @@ private fun JrsAiGuardRootApp(
                     Text(
                         text = "JRS AI Guard",
                         style = MaterialTheme.typography.displaySmall,
-                        color = TextPrimary,
+                        color = palette.textPrimary,
                         fontWeight = FontWeight.Bold
                     )
                     Text(
-                        text = "${BuildConfig.APPLICATION_ID} • Md Jakariya Hasan",
+                        text = "Security Watchdog • Md Jakariya Hasan",
                         style = MaterialTheme.typography.labelMedium,
-                        color = NeonCyan
+                        color = palette.cyan
                     )
                 }
             }

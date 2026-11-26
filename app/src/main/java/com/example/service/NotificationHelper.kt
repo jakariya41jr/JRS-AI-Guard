@@ -57,7 +57,7 @@ object NotificationHelper {
 
     fun buildWatchdogNotification(context: Context, subtitle: String) =
         NotificationCompat.Builder(context, CHANNEL_WATCHDOG)
-            .setSmallIcon(R.drawable.ic_launcher_foreground)
+            .setSmallIcon(R.drawable.ic_stat_jrs_guard)
             .setContentTitle("JRS AI Guard Watchdog Active")
             .setContentText(subtitle)
             .setOngoing(true)
@@ -68,7 +68,7 @@ object NotificationHelper {
         if (!canPostNotifications(context)) return
         ensureChannels(context)
         val notification = NotificationCompat.Builder(context, CHANNEL_CRITICAL)
-            .setSmallIcon(R.drawable.ic_launcher_foreground)
+            .setSmallIcon(R.drawable.ic_stat_jrs_guard)
             .setContentTitle(title)
             .setContentText(message)
             .setStyle(NotificationCompat.BigTextStyle().bigText(message))
@@ -83,7 +83,7 @@ object NotificationHelper {
         if (!canPostNotifications(context)) return
         ensureChannels(context)
         val notification = NotificationCompat.Builder(context, CHANNEL_DIGEST)
-            .setSmallIcon(R.drawable.ic_launcher_foreground)
+            .setSmallIcon(R.drawable.ic_stat_jrs_guard)
             .setContentTitle(title)
             .setContentText(summary)
             .setStyle(NotificationCompat.BigTextStyle().bigText(summary))

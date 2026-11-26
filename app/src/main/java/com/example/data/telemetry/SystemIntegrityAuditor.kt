@@ -111,19 +111,21 @@ class SystemIntegrityAuditor(
             }
         )
 
-        // 5. Root Binary Checksums (when Rooted) vs Non-Root Safety Net
+        // 5. Root Binary Checksums & Deep Root Posture vs Non-Root Safety Net
         if (rootStatus.mode == GuardOperatingMode.ROOTED_ACTIVE) {
             val shHash = rootBridge.computeRootSystemFileHash("/system/bin/sh")
             val appProcHash = rootBridge.computeRootSystemFileHash("/system/bin/app_process64")
+            val hostsLines = rootBridge.checkHostsFileCustomEntries()
             checks += IntegrityCheckItem(
                 id = "root_sys_bin",
                 title = "System Binary SHA-256 Watch",
                 statusLabel = if (shHash != null || appProcHash != null) "VERIFIED" else "PARTIAL",
                 passed = shHash != null || appProcHash != null,
                 detail = buildString {
-                    append("Root binary audit active. ")
-                    if (shHash != null) append("sh=${shHash.take(12)}… ")
-                    if (appProcHash != null) append("app_process64=${appProcHash.take(12)}…")
+                    append("${rootStatus.rootManagerName} (${rootStatus.moduleCount} modules) • Boot: ${rootStatus.verifiedBootState}. ")
+                    if (shHash != null) append("sh=${shHash.take(10)}… ")
+                    if (appProcHash != null) append("app_process64=${appProcHash.take(10)}… ")
+                    append("• hosts entries: $hostsLines")
                 },
                 rootRequired = true
             )

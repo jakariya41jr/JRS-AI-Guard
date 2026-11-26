@@ -1,5 +1,17 @@
 package com.example.ui.components
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
@@ -13,6 +25,7 @@ import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
@@ -31,7 +44,7 @@ import androidx.compose.material.icons.rounded.Language
 import androidx.compose.material.icons.rounded.Lock
 import androidx.compose.material.icons.rounded.PowerSettingsNew
 import androidx.compose.material.icons.rounded.Security
-import androidx.compose.material.icons.rounded.Shield
+import androidx.compose.material.icons.rounded.Terminal
 import androidx.compose.material.icons.rounded.Visibility
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -46,54 +59,51 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.scale
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.example.data.local.SeverityLevel
 import com.example.data.local.TrustLevel
 import com.example.ui.QuickActionTarget
-import com.example.ui.theme.AlertCrimson
-import com.example.ui.theme.AmberPulse
-import com.example.ui.theme.CyberEmerald
-import com.example.ui.theme.ElectricBlue
-import com.example.ui.theme.GlassStroke
-import com.example.ui.theme.GlassStrokeBright
-import com.example.ui.theme.NeonCyan
-import com.example.ui.theme.ObsidianCard
-import com.example.ui.theme.ObsidianCardElevated
-import com.example.ui.theme.ObsidianDeep
-import com.example.ui.theme.ObsidianVoid
-import com.example.ui.theme.TextMuted
-import com.example.ui.theme.TextPrimary
-import com.example.ui.theme.TextSecondary
+import com.example.ui.theme.LocalJrsPalette
+import kotlinx.coroutines.delay
 
 @Composable
 fun GlassCard(
     modifier: Modifier = Modifier,
-    accentBorder: Color = GlassStroke,
+    accentBorder: Color? = null,
     onClick: (() -> Unit)? = null,
     content: @Composable ColumnScope.() -> Unit
 ) {
+    val palette = LocalJrsPalette.current
     val shape = RoundedCornerShape(18.dp)
+    val strokeColor = accentBorder ?: palette.glassStroke
     val baseModifier = modifier
         .clip(shape)
         .background(
             brush = Brush.linearGradient(
-                colors = listOf(ObsidianCardElevated, ObsidianCard)
+                colors = listOf(palette.cardTop, palette.cardBottom)
             )
         )
-        .border(width = 1.dp, color = accentBorder, shape = shape)
+        .border(width = 1.dp, color = strokeColor, shape = shape)
         .let { if (onClick != null) it.clickable(onClick = onClick) else it }
 
     Column(
@@ -108,10 +118,12 @@ fun NeonBadge(
     color: Color,
     modifier: Modifier = Modifier
 ) {
+    val palette = LocalJrsPalette.current
+    val bgAlpha = if (palette.isDark) 0.14f else 0.12f
     Surface(
         modifier = modifier,
         shape = RoundedCornerShape(8.dp),
-        color = color.copy(alpha = 0.14f),
+        color = color.copy(alpha = bgAlpha),
         border = BorderStroke(1.dp, color.copy(alpha = 0.45f))
     ) {
         Text(
@@ -127,20 +139,183 @@ fun NeonBadge(
 }
 
 @Composable
+fun RootVibeBadge(
+    text: String,
+    isRootActive: Boolean,
+    modifier: Modifier = Modifier
+) {
+    val palette = LocalJrsPalette.current
+    val infiniteTransition = rememberInfiniteTransition(label = "root_vibe_pulse")
+    val pulse by infiniteTransition.animateFloat(
+        initialValue = 0.45f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(900, easing = FastOutSlowInEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "pulse_alpha"
+    )
+    val badgeColor = if (isRootActive) palette.emerald else palette.cyan
+
+    Surface(
+        modifier = modifier,
+        shape = RoundedCornerShape(9.dp),
+        color = badgeColor.copy(alpha = if (isRootActive) 0.16f else 0.13f),
+        border = BorderStroke(
+            width = if (isRootActive) 1.25.dp else 1.dp,
+            color = badgeColor.copy(alpha = if (isRootActive) pulse else 0.45f)
+        )
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 9.dp, vertical = 4.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(6.dp)
+        ) {
+            if (isRootActive) {
+                Box(
+                    modifier = Modifier
+                        .size(7.dp)
+                        .clip(CircleShape)
+                        .background(palette.emerald.copy(alpha = pulse))
+                )
+            }
+            Text(
+                text = text,
+                color = badgeColor,
+                style = MaterialTheme.typography.labelSmall,
+                fontWeight = FontWeight.Bold,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+        }
+    }
+}
+
+@Composable
+fun RootGrantCelebrationOverlay(
+    visible: Boolean,
+    rootManagerName: String,
+    uidOutput: String,
+    onDismiss: () -> Unit
+) {
+    val palette = LocalJrsPalette.current
+    val haptic = LocalHapticFeedback.current
+    val pulseAnim = remember { Animatable(0f) }
+    val scaleAnim = remember { Animatable(0.75f) }
+
+    LaunchedEffect(visible) {
+        if (visible) {
+            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+            pulseAnim.snapTo(0f)
+            scaleAnim.snapTo(0.78f)
+            scaleAnim.animateTo(
+                targetValue = 1f,
+                animationSpec = tween(420, easing = FastOutSlowInEasing)
+            )
+            pulseAnim.animateTo(
+                targetValue = 1f,
+                animationSpec = tween(1300, easing = LinearEasing)
+            )
+            delay(1100)
+            onDismiss()
+        }
+    }
+
+    AnimatedVisibility(
+        visible = visible,
+        enter = fadeIn(tween(240)) + scaleIn(initialScale = 0.88f),
+        exit = fadeOut(tween(300))
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(Color.Black.copy(alpha = 0.72f))
+                .clickable(onClick = onDismiss)
+                .testTag("root_grant_overlay"),
+            contentAlignment = Alignment.Center
+        ) {
+            Canvas(modifier = Modifier.size(280.dp)) {
+                val p = pulseAnim.value
+                val center = Offset(size.width / 2f, size.height / 2f)
+                val maxR = size.minDimension / 2f
+                drawCircle(
+                    color = palette.emerald.copy(alpha = (1f - p) * 0.48f),
+                    radius = maxR * (0.35f + p * 0.65f),
+                    center = center,
+                    style = Stroke(width = 4.dp.toPx())
+                )
+                drawCircle(
+                    color = palette.cyan.copy(alpha = (1f - p) * 0.35f),
+                    radius = maxR * (0.2f + p * 0.52f),
+                    center = center,
+                    style = Stroke(width = 2.5.dp.toPx())
+                )
+            }
+
+            Surface(
+                shape = RoundedCornerShape(24.dp),
+                color = palette.cardTop.copy(alpha = 0.98f),
+                border = BorderStroke(1.5.dp, palette.emerald),
+                modifier = Modifier
+                    .padding(horizontal = 32.dp)
+                    .scale(scaleAnim.value)
+            ) {
+                Column(
+                    modifier = Modifier.padding(24.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(64.dp)
+                            .clip(CircleShape)
+                            .background(palette.emerald.copy(alpha = 0.18f))
+                            .border(1.5.dp, palette.emerald, CircleShape),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.Rounded.Terminal,
+                            contentDescription = "Root Access Granted",
+                            tint = palette.emerald,
+                            modifier = Modifier.size(32.dp)
+                        )
+                    }
+                    NeonBadge(text = "ROOT VIBE ACTIVE", color = palette.emerald)
+                    Text(
+                        text = "Root Access Granted",
+                        style = MaterialTheme.typography.headlineSmall,
+                        color = palette.textPrimary,
+                        fontWeight = FontWeight.Bold,
+                        textAlign = TextAlign.Center
+                    )
+                    Text(
+                        text = "$rootManagerName • $uidOutput\nDeep kernel firewall, AppOps attribution & binary integrity watch unlocked.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = palette.textSecondary,
+                        textAlign = TextAlign.Center
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
 fun JrsShieldLogo(
     size: Dp = 44.dp,
     modifier: Modifier = Modifier
 ) {
+    val palette = LocalJrsPalette.current
     Box(
         modifier = modifier
             .size(size)
             .clip(RoundedCornerShape(14.dp))
             .background(
                 Brush.radialGradient(
-                    colors = listOf(NeonCyan.copy(alpha = 0.22f), ObsidianDeep)
+                    colors = listOf(palette.cyan.copy(alpha = 0.22f), palette.surface)
                 )
             )
-            .border(1.dp, GlassStrokeBright, RoundedCornerShape(14.dp)),
+            .border(1.dp, palette.glassStrokeBright, RoundedCornerShape(14.dp)),
         contentAlignment = Alignment.Center
     ) {
         Canvas(modifier = Modifier.size(size * 0.68f)) {
@@ -157,18 +332,17 @@ fun JrsShieldLogo(
             }
             drawPath(
                 path = shieldPath,
-                brush = Brush.linearGradient(listOf(NeonCyan, CyberEmerald)),
+                brush = Brush.linearGradient(listOf(palette.cyan, palette.emerald)),
                 style = Stroke(width = w * 0.09f, cap = StrokeCap.Round)
             )
-            // Neural AI Sentinel Eye
             drawCircle(
-                color = NeonCyan,
+                color = palette.cyan,
                 radius = w * 0.13f,
                 center = Offset(w * 0.5f, h * 0.47f),
                 style = Stroke(width = w * 0.065f)
             )
             drawCircle(
-                color = CyberEmerald,
+                color = palette.emerald,
                 radius = w * 0.055f,
                 center = Offset(w * 0.5f, h * 0.47f)
             )
@@ -181,10 +355,11 @@ fun IntegrityGauge(
     score: Int,
     modifier: Modifier = Modifier
 ) {
+    val palette = LocalJrsPalette.current
     val ringColor = when {
-        score >= 80 -> CyberEmerald
-        score >= 55 -> AmberPulse
-        else -> AlertCrimson
+        score >= 80 -> palette.emerald
+        score >= 55 -> palette.amber
+        else -> palette.crimson
     }
     Box(
         modifier = modifier.size(104.dp),
@@ -192,14 +367,14 @@ fun IntegrityGauge(
     ) {
         Canvas(modifier = Modifier.size(96.dp)) {
             drawArc(
-                color = Color.White.copy(alpha = 0.09f),
+                color = palette.trackMuted,
                 startAngle = -220f,
                 sweepAngle = 260f,
                 useCenter = false,
                 style = Stroke(width = 10.dp.toPx(), cap = StrokeCap.Round)
             )
             drawArc(
-                brush = Brush.sweepGradient(listOf(NeonCyan, ringColor)),
+                brush = Brush.sweepGradient(listOf(palette.cyan, ringColor)),
                 startAngle = -220f,
                 sweepAngle = 260f * (score.coerceIn(0, 100) / 100f),
                 useCenter = false,
@@ -210,7 +385,7 @@ fun IntegrityGauge(
             Text(
                 text = "$score",
                 style = MaterialTheme.typography.headlineMedium,
-                color = TextPrimary,
+                color = palette.textPrimary,
                 fontWeight = FontWeight.Bold
             )
             Text(
@@ -227,6 +402,7 @@ fun OfficialWebsiteButton(
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val palette = LocalJrsPalette.current
     Button(
         onClick = onClick,
         modifier = modifier
@@ -234,10 +410,10 @@ fun OfficialWebsiteButton(
             .testTag("official_website_button"),
         shape = RoundedCornerShape(14.dp),
         colors = ButtonDefaults.buttonColors(
-            containerColor = NeonCyan.copy(alpha = 0.16f),
-            contentColor = NeonCyan
+            containerColor = palette.cyan.copy(alpha = 0.14f),
+            contentColor = palette.cyan
         ),
-        border = BorderStroke(1.dp, NeonCyan.copy(alpha = 0.55f))
+        border = BorderStroke(1.dp, palette.cyan.copy(alpha = 0.55f))
     ) {
         Icon(
             imageVector = Icons.Rounded.Language,
@@ -258,17 +434,25 @@ fun OfficialWebsiteButton(
     }
 }
 
-fun severityColor(severity: String): Color = when (severity) {
-    SeverityLevel.CRITICAL.name -> AlertCrimson
-    SeverityLevel.HIGH.name -> Color(0xFFFF6D00)
-    SeverityLevel.MEDIUM.name -> AmberPulse
-    else -> NeonCyan
+@Composable
+fun severityColor(severity: String): Color {
+    val palette = LocalJrsPalette.current
+    return when (severity) {
+        SeverityLevel.CRITICAL.name -> palette.crimson
+        SeverityLevel.HIGH.name -> Color(0xFFEA580C)
+        SeverityLevel.MEDIUM.name -> palette.amber
+        else -> palette.cyan
+    }
 }
 
-fun trustColor(level: String): Color = when (level) {
-    TrustLevel.BLOCKED.name -> AlertCrimson
-    TrustLevel.WATCHLIST.name -> AmberPulse
-    else -> CyberEmerald
+@Composable
+fun trustColor(level: String): Color {
+    val palette = LocalJrsPalette.current
+    return when (level) {
+        TrustLevel.BLOCKED.name -> palette.crimson
+        TrustLevel.WATCHLIST.name -> palette.amber
+        else -> palette.emerald
+    }
 }
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
@@ -282,10 +466,11 @@ fun QuickActionControlSheet(
     onRevokePerm: (String, String) -> Unit,
     onUpdateTrust: (String, TrustLevel) -> Unit
 ) {
+    val palette = LocalJrsPalette.current
     ModalBottomSheet(
         onDismissRequest = onDismiss,
-        containerColor = ObsidianDeep,
-        contentColor = TextPrimary
+        containerColor = palette.surface,
+        contentColor = palette.textPrimary
     ) {
         Column(
             modifier = Modifier
@@ -303,31 +488,31 @@ fun QuickActionControlSheet(
                     Text(
                         text = target.appName,
                         style = MaterialTheme.typography.titleLarge,
-                        color = TextPrimary
+                        color = palette.textPrimary
                     )
                     Text(
                         text = target.packageName,
                         style = MaterialTheme.typography.labelMedium,
-                        color = TextSecondary
+                        color = palette.textSecondary
                     )
                 }
                 IconButton(
                     onClick = onDismiss,
                     modifier = Modifier.testTag("close_quick_actions")
                 ) {
-                    Icon(Icons.Rounded.Close, contentDescription = "Close controls", tint = TextSecondary)
+                    Icon(Icons.Rounded.Close, contentDescription = "Close controls", tint = palette.textSecondary)
                 }
             }
 
             NeonBadge(
                 text = if (isRootActive) "ROOT QUICK EXECUTION READY" else "NON-ROOT SAFETY GUIDANCE",
-                color = if (isRootActive) CyberEmerald else ElectricBlue
+                color = if (isRootActive) palette.emerald else palette.blue
             )
 
             Text(
                 text = "App Trust Classification",
                 style = MaterialTheme.typography.labelLarge,
-                color = TextSecondary
+                color = palette.textSecondary
             )
 
             Row(
@@ -368,7 +553,7 @@ fun QuickActionControlSheet(
             Text(
                 text = "One-Tap Containment",
                 style = MaterialTheme.typography.labelLarge,
-                color = TextSecondary
+                color = palette.textSecondary
             )
 
             Row(
@@ -382,10 +567,10 @@ fun QuickActionControlSheet(
                         .heightIn(min = 48.dp)
                         .testTag("action_force_stop"),
                     colors = ButtonDefaults.buttonColors(
-                        containerColor = AmberPulse.copy(alpha = 0.18f),
-                        contentColor = AmberPulse
+                        containerColor = palette.amber.copy(alpha = 0.16f),
+                        contentColor = palette.amber
                     ),
-                    border = BorderStroke(1.dp, AmberPulse.copy(alpha = 0.5f))
+                    border = BorderStroke(1.dp, palette.amber.copy(alpha = 0.5f))
                 ) {
                     Icon(Icons.Rounded.PowerSettingsNew, contentDescription = null, modifier = Modifier.size(18.dp))
                     Spacer(Modifier.width(6.dp))
@@ -399,10 +584,10 @@ fun QuickActionControlSheet(
                         .heightIn(min = 48.dp)
                         .testTag("action_freeze_app"),
                     colors = ButtonDefaults.buttonColors(
-                        containerColor = AlertCrimson.copy(alpha = 0.18f),
-                        contentColor = AlertCrimson
+                        containerColor = palette.crimson.copy(alpha = 0.16f),
+                        contentColor = palette.crimson
                     ),
-                    border = BorderStroke(1.dp, AlertCrimson.copy(alpha = 0.5f))
+                    border = BorderStroke(1.dp, palette.crimson.copy(alpha = 0.5f))
                 ) {
                     Icon(Icons.Rounded.Lock, contentDescription = null, modifier = Modifier.size(18.dp))
                     Spacer(Modifier.width(6.dp))
@@ -414,7 +599,7 @@ fun QuickActionControlSheet(
                 Text(
                     text = "Revoke Sensitive Permission",
                     style = MaterialTheme.typography.labelLarge,
-                    color = TextSecondary
+                    color = palette.textSecondary
                 )
                 FlowRow(
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -426,16 +611,16 @@ fun QuickActionControlSheet(
                             modifier = Modifier
                                 .heightIn(min = 48.dp)
                                 .testTag("revoke_${perm.lowercase()}"),
-                            border = BorderStroke(1.dp, NeonCyan.copy(alpha = 0.45f))
+                            border = BorderStroke(1.dp, palette.cyan.copy(alpha = 0.45f))
                         ) {
                             Icon(
                                 Icons.Rounded.Bolt,
                                 contentDescription = null,
-                                tint = NeonCyan,
+                                tint = palette.cyan,
                                 modifier = Modifier.size(15.dp)
                             )
                             Spacer(Modifier.width(4.dp))
-                            Text("Revoke $perm", color = TextPrimary, style = MaterialTheme.typography.labelMedium)
+                            Text("Revoke $perm", color = palette.textPrimary, style = MaterialTheme.typography.labelMedium)
                         }
                     }
                 }
@@ -446,11 +631,11 @@ fun QuickActionControlSheet(
                         .fillMaxWidth()
                         .heightIn(min = 48.dp)
                         .testTag("open_app_permissions"),
-                    border = BorderStroke(1.dp, GlassStrokeBright)
+                    border = BorderStroke(1.dp, palette.glassStrokeBright)
                 ) {
-                    Icon(Icons.Rounded.Security, contentDescription = null, tint = NeonCyan)
+                    Icon(Icons.Rounded.Security, contentDescription = null, tint = palette.cyan)
                     Spacer(Modifier.width(8.dp))
-                    Text("Manage / Revoke App Permissions", color = NeonCyan)
+                    Text("Manage / Revoke App Permissions", color = palette.cyan)
                 }
             }
 
@@ -461,7 +646,7 @@ fun QuickActionControlSheet(
                     "Non-root safety net opens Android system controls when root privileges are absent."
                 },
                 style = MaterialTheme.typography.bodySmall,
-                color = TextMuted
+                color = palette.textMuted
             )
         }
     }

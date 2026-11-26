@@ -2,6 +2,8 @@
 <resources>
     <color name="obsidian_bg">#FF05080F</color>
     <color name="obsidian_surface">#FF0B1220</color>
+    <color name="light_bg">#FFF4F7FB</color>
+    <color name="light_surface">#FFFFFFFF</color>
     <color name="neon_cyan">#FF00F0FF</color>
     <color name="cyber_emerald">#FF00E676</color>
     <color name="black">#FF000000</color>

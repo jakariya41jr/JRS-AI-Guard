@@ -420,6 +420,11 @@ class SystemTelemetryCollector(
     private suspend fun collectRootWatchTelemetry(nowMs: Long, apps: List<AppTrustEntity>) {
         val suLogs = rootBridge.readRootSuAccessLogs()
         val rootSockets = rootBridge.readRootActiveConnections()
+        val appOps = rootBridge.readRootAppOpsSensorLogs()
+        val sensorClients = rootBridge.readRootActiveSensorClients()
+        val topProcesses = rootBridge.readRootTopProcesses()
+        val modules = rootBridge.readRootModuleNames()
+        val appMap = apps.associateBy { it.packageName }
         val events = mutableListOf<TimelineEventEntity>()
 
         if (suLogs.isNotEmpty()) {
@@ -434,6 +439,71 @@ class SystemTelemetryCollector(
                 endTimeMs = nowMs,
                 durationMs = 3000L,
                 severity = SeverityLevel.HIGH.name
+            )
+        }
+
+        if (modules.isNotEmpty()) {
+            events += TimelineEventEntity(
+                category = EventCategory.ROOT_WATCH.name,
+                packageName = "root.modules",
+                appName = "Root Module Audit",
+                actionTitle = "${modules.size} Root Modules Active",
+                detail = "Loaded modules: ${modules.take(6).joinToString(", ")}",
+                permissionOrResource = "/data/adb/modules",
+                startTimeMs = nowMs - 1500L,
+                endTimeMs = nowMs,
+                durationMs = 1500L,
+                severity = SeverityLevel.INFO.name
+            )
+        }
+
+        appOps.take(5).forEach { op ->
+            val matched = appMap[op.packageName]
+            events += TimelineEventEntity(
+                category = EventCategory.SENSOR_LEASE.name,
+                packageName = op.packageName,
+                appName = matched?.appName ?: op.packageName.substringAfterLast('.'),
+                actionTitle = "Root AppOps Attribution (${op.operation})",
+                detail = op.detail,
+                permissionOrResource = op.operation,
+                startTimeMs = nowMs - 4000L,
+                endTimeMs = nowMs,
+                durationMs = 4000L,
+                severity = if (op.operation == "CAMERA" || op.operation == "RECORD_AUDIO") {
+                    SeverityLevel.HIGH.name
+                } else {
+                    SeverityLevel.MEDIUM.name
+                }
+            )
+        }
+
+        if (sensorClients.isNotEmpty()) {
+            events += TimelineEventEntity(
+                category = EventCategory.SENSOR_LEASE.name,
+                packageName = "kernel.sensorservice",
+                appName = "Root SensorService Watch",
+                actionTitle = "Hardware Sensor Clients (${sensorClients.size})",
+                detail = sensorClients.take(3).joinToString(" | "),
+                permissionOrResource = "sensorservice",
+                startTimeMs = nowMs - 2000L,
+                endTimeMs = nowMs,
+                durationMs = 2000L,
+                severity = SeverityLevel.INFO.name
+            )
+        }
+
+        if (topProcesses.isNotEmpty()) {
+            events += TimelineEventEntity(
+                category = EventCategory.BACKGROUND_RESOURCE.name,
+                packageName = "kernel.scheduler",
+                appName = "Root Process Watch",
+                actionTitle = "Kernel Process Snapshot (${topProcesses.size} active)",
+                detail = topProcesses.take(3).joinToString(" | "),
+                permissionOrResource = "root top",
+                startTimeMs = nowMs - 2000L,
+                endTimeMs = nowMs,
+                durationMs = 2000L,
+                severity = SeverityLevel.INFO.name
             )
         }
 

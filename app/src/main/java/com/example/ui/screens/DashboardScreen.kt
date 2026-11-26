@@ -21,8 +21,11 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.BrightnessAuto
 import androidx.compose.material.icons.rounded.CameraAlt
 import androidx.compose.material.icons.rounded.ContentPaste
+import androidx.compose.material.icons.rounded.DarkMode
+import androidx.compose.material.icons.rounded.LightMode
 import androidx.compose.material.icons.rounded.Memory
 import androidx.compose.material.icons.rounded.PhotoLibrary
 import androidx.compose.material.icons.rounded.Refresh
@@ -37,6 +40,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
@@ -54,13 +58,13 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import com.example.BuildConfig
 import com.example.R
 import com.example.data.local.AppTrustEntity
 import com.example.data.local.EventCategory
 import com.example.data.local.NetworkSessionEntity
 import com.example.data.local.TimelineEventEntity
 import com.example.data.telemetry.IntegrityAuditReport
+import com.example.security.AppThemeMode
 import com.example.security.GuardOperatingMode
 import com.example.security.VaultConfig
 import com.example.ui.components.GlassCard
@@ -68,19 +72,9 @@ import com.example.ui.components.IntegrityGauge
 import com.example.ui.components.JrsShieldLogo
 import com.example.ui.components.NeonBadge
 import com.example.ui.components.OfficialWebsiteButton
+import com.example.ui.components.RootVibeBadge
 import com.example.ui.components.severityColor
-import com.example.ui.theme.AlertCrimson
-import com.example.ui.theme.AmberPulse
-import com.example.ui.theme.CyberEmerald
-import com.example.ui.theme.ElectricBlue
-import com.example.ui.theme.GlassStrokeBright
-import com.example.ui.theme.NeonCyan
-import com.example.ui.theme.ObsidianDeep
-import com.example.ui.theme.ObsidianVoid
-import com.example.ui.theme.TextMuted
-import com.example.ui.theme.TextPrimary
-import com.example.ui.theme.TextSecondary
-import com.example.ui.theme.VioletNeural
+import com.example.ui.theme.LocalJrsPalette
 import com.example.util.TimeFormatter
 
 @Composable
@@ -92,6 +86,8 @@ fun DashboardScreen(
     networkSessions: List<NetworkSessionEntity>,
     isRefreshing: Boolean,
     onRefresh: () -> Unit,
+    onVerifyRoot: () -> Unit,
+    onCycleThemeMode: () -> Unit,
     onToggleWatchdog: (Boolean) -> Unit,
     onGrantUsageAccess: () -> Unit,
     onCaptureSnapshot: () -> Unit,
@@ -99,12 +95,14 @@ fun DashboardScreen(
     onOpenCategory: (EventCategory) -> Unit,
     onOpenOfficialWebsite: () -> Unit
 ) {
+    val palette = LocalJrsPalette.current
     val mode = integrityReport?.rootStatus?.mode ?: GuardOperatingMode.NON_ROOT_SAFETY_NET
+    val isRootActive = mode == GuardOperatingMode.ROOTED_ACTIVE
     val score = integrityReport?.overallScore ?: 85
     val modeColor = when (mode) {
-        GuardOperatingMode.ROOTED_ACTIVE -> CyberEmerald
-        GuardOperatingMode.ROOT_BINARY_LOCKED -> AmberPulse
-        GuardOperatingMode.NON_ROOT_SAFETY_NET -> NeonCyan
+        GuardOperatingMode.ROOTED_ACTIVE -> palette.emerald
+        GuardOperatingMode.ROOT_BINARY_LOCKED -> palette.amber
+        GuardOperatingMode.NON_ROOT_SAFETY_NET -> palette.cyan
     }
 
     val sensorCount = events.count { it.category == EventCategory.SENSOR_LEASE.name }
@@ -114,142 +112,214 @@ fun DashboardScreen(
     val bgSpikeCount = events.count { it.category == EventCategory.BACKGROUND_RESOURCE.name }
     val netSpikeCount = networkSessions.count { it.isSpike }
 
+    val highRiskCount = apps.count { it.riskScore >= 65 }
+
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(16.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp)
     ) {
         item {
-            // Branded Hero Banner Card
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clip(RoundedCornerShape(22.dp))
-                    .background(ObsidianDeep)
+            // Modern Branded Hero Card (Light & Dark adaptive)
+            Surface(
+                shape = RoundedCornerShape(22.dp),
+                color = palette.cardTop,
+                border = BorderStroke(
+                    1.dp,
+                    if (isRootActive) palette.emerald.copy(alpha = 0.5f) else palette.glassStrokeBright
+                ),
+                modifier = Modifier.fillMaxWidth()
             ) {
-                Image(
-                    painter = painterResource(id = R.drawable.img_jrs_hero_banner),
-                    contentDescription = "JRS AI Guard defense grid banner",
-                    contentScale = ContentScale.Crop,
-                    modifier = Modifier
-                        .matchParentSize()
-                        .alpha(0.38f)
-                )
-                Box(
-                    modifier = Modifier
-                        .matchParentSize()
-                        .background(
-                            Brush.verticalGradient(
-                                colors = listOf(
-                                    ObsidianVoid.copy(alpha = 0.5f),
-                                    ObsidianVoid.copy(alpha = 0.92f)
+                Box {
+                    Image(
+                        painter = painterResource(id = R.drawable.img_jrs_hero_banner),
+                        contentDescription = "JRS AI Guard defense grid banner",
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier
+                            .matchParentSize()
+                            .alpha(if (palette.isDark) 0.34f else 0.08f)
+                    )
+                    Box(
+                        modifier = Modifier
+                            .matchParentSize()
+                            .background(
+                                Brush.verticalGradient(
+                                    colors = listOf(
+                                        palette.cardTop.copy(alpha = if (palette.isDark) 0.45f else 0.88f),
+                                        palette.cardBottom.copy(alpha = if (palette.isDark) 0.92f else 0.96f)
+                                    )
                                 )
                             )
-                        )
-                )
+                    )
 
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(18.dp),
-                    verticalArrangement = Arrangement.spacedBy(14.dp)
-                ) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.SpaceBetween
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(18.dp),
+                        verticalArrangement = Arrangement.spacedBy(14.dp)
                     ) {
                         Row(
+                            modifier = Modifier.fillMaxWidth(),
                             verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(12.dp),
-                            modifier = Modifier.weight(1f)
+                            horizontalArrangement = Arrangement.SpaceBetween
                         ) {
-                            JrsShieldLogo(size = 48.dp)
-                            Column {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                                modifier = Modifier.weight(1f)
+                            ) {
+                                JrsShieldLogo(size = 46.dp)
+                                Column {
+                                    Text(
+                                        text = "JRS AI Guard",
+                                        style = MaterialTheme.typography.headlineSmall,
+                                        color = palette.textPrimary,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                    Text(
+                                        text = "Developed by Md Jakariya Hasan",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = palette.textSecondary,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
+                                }
+                            }
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                IconButton(
+                                    onClick = onCycleThemeMode,
+                                    modifier = Modifier.testTag("dashboard_theme_button")
+                                ) {
+                                    val themeIcon = when (vaultConfig.themeMode) {
+                                        AppThemeMode.DARK -> Icons.Rounded.DarkMode
+                                        AppThemeMode.LIGHT -> Icons.Rounded.LightMode
+                                        AppThemeMode.SYSTEM -> Icons.Rounded.BrightnessAuto
+                                    }
+                                    Icon(
+                                        imageVector = themeIcon,
+                                        contentDescription = "Switch Theme (${vaultConfig.themeMode.label})",
+                                        tint = palette.cyan
+                                    )
+                                }
+                                IconButton(
+                                    onClick = onRefresh,
+                                    modifier = Modifier.testTag("dashboard_refresh_button")
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Rounded.Refresh,
+                                        contentDescription = "Refresh telemetry",
+                                        tint = palette.cyan
+                                    )
+                                }
+                            }
+                        }
+
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            IntegrityGauge(score = score)
+                            Spacer(Modifier.width(14.dp))
+                            Column(
+                                modifier = Modifier.weight(1f),
+                                verticalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                if (isRootActive) {
+                                    RootVibeBadge(text = mode.badge, isRootActive = true)
+                                } else {
+                                    NeonBadge(text = mode.badge, color = modeColor)
+                                }
                                 Text(
-                                    text = "JRS AI Guard",
-                                    style = MaterialTheme.typography.headlineSmall,
-                                    color = TextPrimary,
-                                    fontWeight = FontWeight.Bold
+                                    text = mode.title,
+                                    style = MaterialTheme.typography.titleMedium,
+                                    color = palette.textPrimary
                                 )
+                                val mgr = integrityReport?.rootStatus?.rootManagerName ?: "Standard"
                                 Text(
-                                    text = "${BuildConfig.APPLICATION_ID} • Md Jakariya Hasan",
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = TextSecondary,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis
+                                    text = "SELinux: ${integrityReport?.rootStatus?.selinuxStatus ?: "Checking"} • $mgr • ${apps.size} apps",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = palette.textSecondary
                                 )
                             }
                         }
-                        IconButton(
-                            onClick = onRefresh,
-                            modifier = Modifier.testTag("dashboard_refresh_button")
-                        ) {
-                            Icon(
-                                imageVector = Icons.Rounded.Refresh,
-                                contentDescription = "Refresh telemetry",
-                                tint = NeonCyan
-                            )
-                        }
-                    }
 
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.SpaceBetween
-                    ) {
-                        IntegrityGauge(score = score)
-                        Spacer(Modifier.width(14.dp))
-                        Column(
-                            modifier = Modifier.weight(1f),
-                            verticalArrangement = Arrangement.spacedBy(6.dp)
-                        ) {
-                            NeonBadge(text = mode.badge, color = modeColor)
-                            Text(
-                                text = mode.title,
-                                style = MaterialTheme.typography.titleMedium,
-                                color = TextPrimary
-                            )
-                            Text(
-                                text = "SELinux: ${integrityReport?.rootStatus?.selinuxStatus ?: "Checking"} • ${apps.size} apps audited",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = TextSecondary
-                            )
-                        }
-                    }
-
-                    if (isRefreshing) {
-                        LinearProgressIndicator(
+                        // Compact Telemetry Summary Strip
+                        Row(
                             modifier = Modifier.fillMaxWidth(),
-                            color = NeonCyan,
-                            trackColor = Color.White.copy(alpha = 0.08f)
-                        )
-                    }
-
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(10.dp)
-                    ) {
-                        Button(
-                            onClick = onCaptureSnapshot,
-                            modifier = Modifier
-                                .weight(1f)
-                                .heightIn(min = 48.dp)
-                                .testTag("capture_snapshot_button"),
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = NeonCyan,
-                                contentColor = ObsidianVoid
-                            ),
-                            shape = RoundedCornerShape(14.dp)
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
-                            Icon(Icons.Rounded.Security, contentDescription = null, modifier = Modifier.size(18.dp))
-                            Spacer(Modifier.width(6.dp))
-                            Text("Snapshot", style = MaterialTheme.typography.labelLarge)
+                            StatPill(
+                                label = "Audited",
+                                value = "${apps.size}",
+                                accent = palette.cyan,
+                                modifier = Modifier.weight(1f)
+                            )
+                            StatPill(
+                                label = "High Risk",
+                                value = "$highRiskCount",
+                                accent = if (highRiskCount > 0) palette.crimson else palette.emerald,
+                                modifier = Modifier.weight(1f)
+                            )
+                            StatPill(
+                                label = "Theme",
+                                value = vaultConfig.themeMode.label,
+                                accent = palette.violet,
+                                modifier = Modifier.weight(1f)
+                            )
+                        }
+
+                        if (isRefreshing) {
+                            LinearProgressIndicator(
+                                modifier = Modifier.fillMaxWidth(),
+                                color = palette.cyan,
+                                trackColor = palette.trackMuted
+                            )
+                        }
+
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Button(
+                                onClick = onCaptureSnapshot,
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .heightIn(min = 48.dp)
+                                    .testTag("capture_snapshot_button"),
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = palette.cyan,
+                                    contentColor = palette.onAccentButton
+                                ),
+                                shape = RoundedCornerShape(14.dp)
+                            ) {
+                                Icon(Icons.Rounded.Security, contentDescription = null, modifier = Modifier.size(17.dp))
+                                Spacer(Modifier.width(6.dp))
+                                Text("Snapshot", style = MaterialTheme.typography.labelLarge)
+                            }
+
+                            OutlinedButton(
+                                onClick = onVerifyRoot,
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .heightIn(min = 48.dp)
+                                    .testTag("verify_root_button"),
+                                shape = RoundedCornerShape(14.dp),
+                                border = BorderStroke(1.dp, modeColor.copy(alpha = 0.65f))
+                            ) {
+                                Icon(Icons.Rounded.Terminal, contentDescription = null, tint = modeColor, modifier = Modifier.size(17.dp))
+                                Spacer(Modifier.width(6.dp))
+                                Text(
+                                    text = if (isRootActive) "Root Pulse" else "Verify Root",
+                                    color = modeColor,
+                                    style = MaterialTheme.typography.labelLarge
+                                )
+                            }
                         }
 
                         OfficialWebsiteButton(
                             onClick = onOpenOfficialWebsite,
-                            modifier = Modifier.weight(1f)
+                            modifier = Modifier.fillMaxWidth()
                         )
                     }
                 }
@@ -259,7 +329,7 @@ fun DashboardScreen(
         // Live Watchdog Service Switch
         item {
             GlassCard(
-                accentBorder = if (vaultConfig.watchdogEnabled) CyberEmerald.copy(alpha = 0.5f) else GlassStrokeBright
+                accentBorder = if (vaultConfig.watchdogEnabled) palette.emerald.copy(alpha = 0.5f) else palette.glassStrokeBright
             ) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -270,12 +340,12 @@ fun DashboardScreen(
                         Text(
                             text = "Real-Time Hardware & Clipboard Watchdog",
                             style = MaterialTheme.typography.titleMedium,
-                            color = TextPrimary
+                            color = palette.textPrimary
                         )
                         Text(
                             text = "Tracks camera, mic leases, screen-off sensor alerts & clipboard access with exact duration.",
                             style = MaterialTheme.typography.bodySmall,
-                            color = TextSecondary
+                            color = palette.textSecondary
                         )
                     }
                     Spacer(Modifier.width(12.dp))
@@ -283,8 +353,8 @@ fun DashboardScreen(
                         checked = vaultConfig.watchdogEnabled,
                         onCheckedChange = onToggleWatchdog,
                         colors = SwitchDefaults.colors(
-                            checkedThumbColor = ObsidianVoid,
-                            checkedTrackColor = CyberEmerald
+                            checkedThumbColor = palette.onAccentButton,
+                            checkedTrackColor = palette.emerald
                         ),
                         modifier = Modifier.testTag("watchdog_service_switch")
                     )
@@ -295,7 +365,7 @@ fun DashboardScreen(
         // Usage Access Setup Banner when Non-Root telemetry needs permission
         item {
             AnimatedVisibility(visible = integrityReport?.usageStatsGranted == false) {
-                GlassCard(accentBorder = AmberPulse.copy(alpha = 0.55f)) {
+                GlassCard(accentBorder = palette.amber.copy(alpha = 0.55f)) {
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(12.dp)
@@ -303,19 +373,19 @@ fun DashboardScreen(
                         Icon(
                             Icons.Rounded.Warning,
                             contentDescription = "Usage access needed",
-                            tint = AmberPulse,
+                            tint = palette.amber,
                             modifier = Modifier.size(26.dp)
                         )
                         Column(modifier = Modifier.weight(1f)) {
                             Text(
                                 text = "Unlock Full Background & Network Timelines",
                                 style = MaterialTheme.typography.titleSmall,
-                                color = TextPrimary
+                                color = palette.textPrimary
                             )
                             Text(
                                 text = "Grant Usage Access so JRS AI Guard can log per-app background runtimes and data spikes without root.",
                                 style = MaterialTheme.typography.bodySmall,
-                                color = TextSecondary
+                                color = palette.textSecondary
                             )
                         }
                     }
@@ -326,9 +396,9 @@ fun DashboardScreen(
                             .fillMaxWidth()
                             .heightIn(min = 48.dp)
                             .testTag("grant_usage_access_button"),
-                        border = BorderStroke(1.dp, AmberPulse)
+                        border = BorderStroke(1.dp, palette.amber)
                     ) {
-                        Text("Open Usage Access Settings", color = AmberPulse)
+                        Text("Open Usage Access Settings", color = palette.amber)
                     }
                 }
             }
@@ -339,7 +409,7 @@ fun DashboardScreen(
             Text(
                 text = "Watchdog Telemetry Modules",
                 style = MaterialTheme.typography.titleMedium,
-                color = TextPrimary
+                color = palette.textPrimary
             )
             Spacer(Modifier.height(8.dp))
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -352,7 +422,7 @@ fun DashboardScreen(
                         value = "$sensorCount",
                         subtitle = "Cam • Mic • Screen-Off",
                         icon = Icons.Rounded.CameraAlt,
-                        accent = NeonCyan,
+                        accent = palette.cyan,
                         modifier = Modifier
                             .weight(1f)
                             .testTag("tile_sensor_leases"),
@@ -361,9 +431,9 @@ fun DashboardScreen(
                     ModuleTile(
                         title = "Root Watch",
                         value = "$rootWatchCount",
-                        subtitle = if (mode == GuardOperatingMode.ROOTED_ACTIVE) "su Active" else "Non-Root Safe",
+                        subtitle = if (isRootActive) "su Active" else "Non-Root Safe",
                         icon = Icons.Rounded.Terminal,
-                        accent = CyberEmerald,
+                        accent = palette.emerald,
                         modifier = Modifier
                             .weight(1f)
                             .testTag("tile_root_watch"),
@@ -379,7 +449,7 @@ fun DashboardScreen(
                         value = "$clipCount",
                         subtitle = "Read & Capture Guard",
                         icon = Icons.Rounded.ContentPaste,
-                        accent = AmberPulse,
+                        accent = palette.amber,
                         modifier = Modifier
                             .weight(1f)
                             .testTag("tile_clipboard_overlay"),
@@ -390,7 +460,7 @@ fun DashboardScreen(
                         value = "$galleryCount",
                         subtitle = "Media + Outbound",
                         icon = Icons.Rounded.PhotoLibrary,
-                        accent = VioletNeural,
+                        accent = palette.violet,
                         modifier = Modifier
                             .weight(1f)
                             .testTag("tile_gallery_data"),
@@ -406,7 +476,7 @@ fun DashboardScreen(
                         value = "$bgSpikeCount",
                         subtitle = "RAM • Battery • Runtime",
                         icon = Icons.Rounded.Memory,
-                        accent = ElectricBlue,
+                        accent = palette.blue,
                         modifier = Modifier
                             .weight(1f)
                             .testTag("tile_background_cpu"),
@@ -417,7 +487,7 @@ fun DashboardScreen(
                         value = "$netSpikeCount",
                         subtitle = "${networkSessions.size} sessions",
                         icon = Icons.Rounded.Shield,
-                        accent = if (netSpikeCount > 0) AlertCrimson else CyberEmerald,
+                        accent = if (netSpikeCount > 0) palette.crimson else palette.emerald,
                         modifier = Modifier
                             .weight(1f)
                             .testTag("tile_net_spikes"),
@@ -432,7 +502,7 @@ fun DashboardScreen(
             Text(
                 text = "Recent Security Events",
                 style = MaterialTheme.typography.titleMedium,
-                color = TextPrimary
+                color = palette.textPrimary
             )
         }
 
@@ -443,7 +513,7 @@ fun DashboardScreen(
                     Text(
                         text = "No anomalies logged yet. Keep Watchdog enabled or tap Refresh to audit installed apps, permissions, and network traffic.",
                         style = MaterialTheme.typography.bodyMedium,
-                        color = TextSecondary
+                        color = palette.textSecondary
                     )
                 }
             }
@@ -463,7 +533,7 @@ fun DashboardScreen(
                         Text(
                             text = ev.appName,
                             style = MaterialTheme.typography.titleSmall,
-                            color = TextPrimary,
+                            color = palette.textPrimary,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
                             modifier = Modifier.weight(1f)
@@ -474,12 +544,12 @@ fun DashboardScreen(
                     Text(
                         text = ev.actionTitle,
                         style = MaterialTheme.typography.bodyMedium,
-                        color = NeonCyan
+                        color = palette.cyan
                     )
                     Text(
                         text = ev.detail,
                         style = MaterialTheme.typography.bodySmall,
-                        color = TextSecondary,
+                        color = palette.textSecondary,
                         maxLines = 2,
                         overflow = TextOverflow.Ellipsis
                     )
@@ -491,16 +561,52 @@ fun DashboardScreen(
                         Text(
                             text = "At ${TimeFormatter.formatShortTime(ev.startTimeMs)}",
                             style = MaterialTheme.typography.labelSmall,
-                            color = TextMuted
+                            color = palette.textMuted
                         )
                         Text(
-                            text = "Active: ${TimeFormatter.formatDuration(ev.durationMs)} • Tap for Quick Actions",
+                            text = "Active: ${TimeFormatter.formatDuration(ev.durationMs)} • Tap for Actions",
                             style = MaterialTheme.typography.labelSmall,
                             color = sevColor
                         )
                     }
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun StatPill(
+    label: String,
+    value: String,
+    accent: Color,
+    modifier: Modifier = Modifier
+) {
+    val palette = LocalJrsPalette.current
+    Surface(
+        modifier = modifier,
+        shape = RoundedCornerShape(12.dp),
+        color = accent.copy(alpha = 0.10f),
+        border = BorderStroke(1.dp, accent.copy(alpha = 0.25f))
+    ) {
+        Column(
+            modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Text(
+                text = value,
+                style = MaterialTheme.typography.titleSmall,
+                color = palette.textPrimary,
+                fontWeight = FontWeight.Bold,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+            Text(
+                text = label,
+                style = MaterialTheme.typography.labelSmall,
+                color = accent,
+                maxLines = 1
+            )
         }
     }
 }
@@ -515,6 +621,7 @@ private fun ModuleTile(
     modifier: Modifier = Modifier,
     onClick: () -> Unit
 ) {
+    val palette = LocalJrsPalette.current
     GlassCard(
         modifier = modifier.heightIn(min = 104.dp),
         accentBorder = accent.copy(alpha = 0.32f),
@@ -534,7 +641,7 @@ private fun ModuleTile(
             Text(
                 text = value,
                 style = MaterialTheme.typography.headlineSmall,
-                color = TextPrimary,
+                color = palette.textPrimary,
                 fontWeight = FontWeight.Bold
             )
         }
@@ -542,14 +649,14 @@ private fun ModuleTile(
         Text(
             text = title,
             style = MaterialTheme.typography.titleSmall,
-            color = TextPrimary,
+            color = palette.textPrimary,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis
         )
         Text(
             text = subtitle,
             style = MaterialTheme.typography.labelSmall,
-            color = TextSecondary,
+            color = palette.textSecondary,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis
         )

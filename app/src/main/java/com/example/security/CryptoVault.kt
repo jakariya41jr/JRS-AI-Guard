@@ -24,6 +24,12 @@ import javax.crypto.spec.GCMParameterSpec
 
 private val Context.vaultDataStore: DataStore<Preferences> by preferencesDataStore(name = "jrs_secure_vault")
 
+enum class AppThemeMode(val label: String) {
+    DARK("Dark"),
+    LIGHT("Light"),
+    SYSTEM("Auto")
+}
+
 enum class AiScheduleFrequency(val label: String, val intervalHours: Long) {
     OFF("Manual Only", 0L),
     DAILY("Daily Digest", 24L),
@@ -40,6 +46,7 @@ data class VaultConfig(
     val watchdogEnabled: Boolean = true,
     val screenOffSensorAlert: Boolean = true,
     val rootRealtimeWatch: Boolean = true,
+    val themeMode: AppThemeMode = AppThemeMode.DARK,
     val githubOwner: String = "Jakariya41jr",
     val githubRepo: String = "JRS-AI-Guard",
     val apiCallsConservedByCache: Int = 0,
@@ -61,6 +68,7 @@ class CryptoVault(private val context: Context) {
         private val KEY_WATCHDOG_ENABLED = booleanPreferencesKey("watchdog_enabled")
         private val KEY_SCREEN_OFF_ALERT = booleanPreferencesKey("screen_off_sensor_alert")
         private val KEY_ROOT_WATCH = booleanPreferencesKey("root_realtime_watch")
+        private val KEY_THEME_MODE = stringPreferencesKey("app_theme_mode")
         private val KEY_GH_OWNER = stringPreferencesKey("github_owner")
         private val KEY_GH_REPO = stringPreferencesKey("github_repo")
         private val KEY_CACHE_SAVED = intPreferencesKey("api_calls_conserved")
@@ -80,6 +88,9 @@ class CryptoVault(private val context: Context) {
             watchdogEnabled = prefs[KEY_WATCHDOG_ENABLED] ?: true,
             screenOffSensorAlert = prefs[KEY_SCREEN_OFF_ALERT] ?: true,
             rootRealtimeWatch = prefs[KEY_ROOT_WATCH] ?: true,
+            themeMode = runCatching {
+                AppThemeMode.valueOf(prefs[KEY_THEME_MODE] ?: AppThemeMode.DARK.name)
+            }.getOrDefault(AppThemeMode.DARK),
             githubOwner = prefs[KEY_GH_OWNER]?.takeIf { it.isNotBlank() } ?: "Jakariya41jr",
             githubRepo = prefs[KEY_GH_REPO]?.takeIf { it.isNotBlank() } ?: "JRS-AI-Guard",
             apiCallsConservedByCache = prefs[KEY_CACHE_SAVED] ?: 0,
@@ -129,6 +140,12 @@ class CryptoVault(private val context: Context) {
             prefs[KEY_WATCHDOG_ENABLED] = watchdogEnabled
             prefs[KEY_SCREEN_OFF_ALERT] = screenOffAlert
             prefs[KEY_ROOT_WATCH] = rootWatch
+        }
+    }
+
+    suspend fun updateThemeMode(mode: AppThemeMode) {
+        context.vaultDataStore.edit { prefs ->
+            prefs[KEY_THEME_MODE] = mode.name
         }
     }
 

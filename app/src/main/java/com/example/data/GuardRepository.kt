@@ -27,10 +27,12 @@ import com.example.data.telemetry.MalwareScanUiResult
 import com.example.data.telemetry.SystemIntegrityAuditor
 import com.example.data.telemetry.SystemTelemetryCollector
 import com.example.security.AiScheduleFrequency
+import com.example.security.AppThemeMode
 import com.example.security.CryptoVault
 import com.example.security.GuardOperatingMode
 import com.example.security.RootActionResult
 import com.example.security.RootBridge
+import com.example.security.RootEnvironmentStatus
 import com.example.security.VaultConfig
 import com.example.service.WatchdogForegroundService
 import kotlinx.coroutines.flow.Flow
@@ -63,6 +65,14 @@ class GuardRepository(private val context: Context) {
         telemetryCollector.refreshAllTelemetry(env.mode)
         val apps = dao.getAllAppTrust()
         return integrityAuditor.runFullIntegrityAudit(apps)
+    }
+
+    suspend fun verifyRootAccess(): RootEnvironmentStatus {
+        return rootBridge.requestAndVerifyRootGrant()
+    }
+
+    suspend fun updateThemeMode(mode: AppThemeMode) {
+        cryptoVault.updateThemeMode(mode)
     }
 
     suspend fun runIntegrityCheckOnly(): IntegrityAuditReport {

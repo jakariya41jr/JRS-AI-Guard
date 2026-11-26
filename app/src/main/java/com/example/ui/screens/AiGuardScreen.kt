@@ -28,6 +28,7 @@ import androidx.compose.material.icons.rounded.AutoAwesome
 import androidx.compose.material.icons.rounded.CloudDownload
 import androidx.compose.material.icons.rounded.DeleteSweep
 import androidx.compose.material.icons.rounded.Key
+import androidx.compose.material.icons.rounded.Palette
 import androidx.compose.material.icons.rounded.Schedule
 import androidx.compose.material.icons.rounded.SystemUpdate
 import androidx.compose.material.icons.rounded.Visibility
@@ -74,23 +75,13 @@ import com.example.data.github.GitHubReleaseInfo
 import com.example.data.local.AiInsightEntity
 import com.example.data.local.ChatMessageEntity
 import com.example.security.AiScheduleFrequency
+import com.example.security.AppThemeMode
 import com.example.security.VaultConfig
 import com.example.ui.components.GlassCard
 import com.example.ui.components.JrsShieldLogo
 import com.example.ui.components.NeonBadge
 import com.example.ui.components.OfficialWebsiteButton
-import com.example.ui.theme.AlertCrimson
-import com.example.ui.theme.AmberPulse
-import com.example.ui.theme.CyberEmerald
-import com.example.ui.theme.GlassStroke
-import com.example.ui.theme.NeonCyan
-import com.example.ui.theme.ObsidianCardElevated
-import com.example.ui.theme.ObsidianDeep
-import com.example.ui.theme.ObsidianVoid
-import com.example.ui.theme.TextMuted
-import com.example.ui.theme.TextPrimary
-import com.example.ui.theme.TextSecondary
-import com.example.ui.theme.VioletNeural
+import com.example.ui.theme.LocalJrsPalette
 import com.example.util.TimeFormatter
 
 @Composable
@@ -108,22 +99,24 @@ fun AiGuardScreen(
     onTestGeminiKey: (String, String, Boolean) -> Unit,
     onUpdateSchedule: (AiScheduleFrequency, Boolean, String) -> Unit,
     onRunDigestNow: () -> Unit,
+    onSetThemeMode: (AppThemeMode) -> Unit,
     onCheckGitHubRelease: (String, String) -> Unit,
     onDownloadReleaseApk: (GitHubReleaseInfo) -> Unit,
     onOpenOfficialWebsite: () -> Unit
 ) {
+    val palette = LocalJrsPalette.current
     var selectedTab by remember { mutableIntStateOf(0) }
     val tabs = listOf("AI Chat", "Vault & Schedule", "Releases & About")
 
     Column(modifier = Modifier.fillMaxSize()) {
         TabRow(
             selectedTabIndex = selectedTab,
-            containerColor = ObsidianDeep,
-            contentColor = NeonCyan,
+            containerColor = palette.navBar,
+            contentColor = palette.cyan,
             indicator = { tabPositions ->
                 TabRowDefaults.SecondaryIndicator(
                     modifier = Modifier.tabIndicatorOffset(tabPositions[selectedTab]),
-                    color = NeonCyan
+                    color = palette.cyan
                 )
             }
         ) {
@@ -167,6 +160,7 @@ fun AiGuardScreen(
                 vaultConfig = vaultConfig,
                 githubRelease = githubRelease,
                 isChecking = isCheckingRelease,
+                onSetThemeMode = onSetThemeMode,
                 onCheckRelease = onCheckGitHubRelease,
                 onDownloadApk = onDownloadReleaseApk,
                 onOpenOfficialWebsite = onOpenOfficialWebsite
@@ -184,6 +178,7 @@ private fun RestrictedAiChatTab(
     onClear: () -> Unit,
     onJumpToVault: () -> Unit
 ) {
+    val palette = LocalJrsPalette.current
     var input by remember { mutableStateOf("") }
     val listState = rememberLazyListState()
 
@@ -194,10 +189,10 @@ private fun RestrictedAiChatTab(
     }
 
     val quickPrompts = listOf(
-        "Summarize my recent security alerts",
-        "Explain Root vs Non-Root mode",
-        "Check high-risk permissions & sideloads",
-        "Who created JRS AI Guard?"
+        "আমার ডিভাইসের নিরাপত্তা সারাংশ দেখাও",
+        "রুট ও নন-রুট মোড কীভাবে কাজ করে?",
+        "ক্যামেরা ও মাইক্রোফোন রিস্ক চেক করো",
+        "JRS AI Guard কে তৈরি করেছেন?"
     )
 
     Column(modifier = Modifier.fillMaxSize()) {
@@ -212,25 +207,25 @@ private fun RestrictedAiChatTab(
                 Text(
                     text = "JRS AI Guard Assistant",
                     style = MaterialTheme.typography.titleMedium,
-                    color = TextPrimary
+                    color = palette.textPrimary
                 )
                 Text(
-                    text = "Strictly scoped to ${BuildConfig.APPLICATION_ID} security & logs",
+                    text = "বাংলা ও English সাপোর্টেড নিরাপত্তা সহকারী",
                     style = MaterialTheme.typography.labelSmall,
-                    color = NeonCyan
+                    color = palette.cyan
                 )
             }
             if (!hasKey) {
                 OutlinedButton(
                     onClick = onJumpToVault,
                     modifier = Modifier.testTag("chat_configure_key_btn"),
-                    border = BorderStroke(1.dp, AmberPulse)
+                    border = BorderStroke(1.dp, palette.amber)
                 ) {
-                    Text("Set Key", color = AmberPulse, style = MaterialTheme.typography.labelSmall)
+                    Text("Set Key", color = palette.amber, style = MaterialTheme.typography.labelSmall)
                 }
             } else {
                 IconButton(onClick = onClear, modifier = Modifier.testTag("clear_chat_button")) {
-                    Icon(Icons.Rounded.DeleteSweep, contentDescription = "Clear chat", tint = TextSecondary)
+                    Icon(Icons.Rounded.DeleteSweep, contentDescription = "Clear chat", tint = palette.textSecondary)
                 }
             }
         }
@@ -253,7 +248,8 @@ private fun RestrictedAiChatTab(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(horizontal = 16.dp, vertical = 6.dp),
-                color = NeonCyan
+                color = palette.cyan,
+                trackColor = palette.trackMuted
             )
         }
 
@@ -267,20 +263,20 @@ private fun RestrictedAiChatTab(
         ) {
             if (messages.isEmpty()) {
                 item {
-                    GlassCard(accentBorder = VioletNeural.copy(alpha = 0.45f)) {
+                    GlassCard(accentBorder = palette.violet.copy(alpha = 0.45f)) {
                         Text(
-                            text = "Ask me anything about JRS AI Guard (${BuildConfig.APPLICATION_ID}): permission durations, sensor screen-off alerts, root su watch, malware scans, snapshots, or privacy hardening. Off-topic requests are declined.",
+                            text = "JRS AI Guard-এ স্বাগতম! আপনার ফোনের পারমিশন টাইমলাইন, ক্যামেরা/মাইক অ্যালার্ট, রুট বা নন-রুট নিরাপত্তা, ম্যালওয়্যার স্ক্যান, স্ন্যাপশট এবং নেটওয়ার্ক সুরক্ষা নিয়ে বাংলায় বা ইংরেজিতে যেকোনো প্রশ্ন করুন।",
                             style = MaterialTheme.typography.bodyMedium,
-                            color = TextSecondary
+                            color = palette.textSecondary
                         )
                     }
                 }
             } else {
                 items(messages, key = { it.id }) { msg ->
                     val bubbleBg = when {
-                        msg.isUser -> NeonCyan.copy(alpha = 0.16f)
-                        msg.isRefusal -> AlertCrimson.copy(alpha = 0.14f)
-                        else -> ObsidianCardElevated
+                        msg.isUser -> palette.cyan.copy(alpha = 0.16f)
+                        msg.isRefusal -> palette.crimson.copy(alpha = 0.14f)
+                        else -> palette.bubbleElevated
                     }
                     Row(
                         modifier = Modifier.fillMaxWidth(),
@@ -295,15 +291,15 @@ private fun RestrictedAiChatTab(
                         ) {
                             Column {
                                 Text(
-                                    text = if (msg.isUser) "You" else "JRS AI Guard",
+                                    text = if (msg.isUser) "আপনি" else "JRS AI Guard",
                                     style = MaterialTheme.typography.labelSmall,
-                                    color = if (msg.isUser) NeonCyan else if (msg.isRefusal) AlertCrimson else CyberEmerald
+                                    color = if (msg.isUser) palette.cyan else if (msg.isRefusal) palette.crimson else palette.emerald
                                 )
                                 Spacer(Modifier.height(4.dp))
                                 Text(
                                     text = msg.messageText,
                                     style = MaterialTheme.typography.bodyMedium,
-                                    color = TextPrimary
+                                    color = palette.textPrimary
                                 )
                             }
                         }
@@ -322,14 +318,14 @@ private fun RestrictedAiChatTab(
             OutlinedTextField(
                 value = input,
                 onValueChange = { input = it },
-                placeholder = { Text("Ask JRS AI Guard about logs, risks…") },
+                placeholder = { Text("বাংলায় বা ইংরেজিতে নিরাপত্তা প্রশ্ন লিখুন…") },
                 singleLine = false,
                 maxLines = 3,
                 colors = OutlinedTextFieldDefaults.colors(
-                    focusedBorderColor = NeonCyan,
-                    unfocusedBorderColor = GlassStroke,
-                    focusedTextColor = TextPrimary,
-                    unfocusedTextColor = TextPrimary
+                    focusedBorderColor = palette.cyan,
+                    unfocusedBorderColor = palette.glassStroke,
+                    focusedTextColor = palette.textPrimary,
+                    unfocusedTextColor = palette.textPrimary
                 ),
                 modifier = Modifier
                     .weight(1f)
@@ -345,10 +341,10 @@ private fun RestrictedAiChatTab(
                 modifier = Modifier
                     .size(48.dp)
                     .clip(RoundedCornerShape(14.dp))
-                    .background(NeonCyan.copy(alpha = if (input.isNotBlank()) 0.22f else 0.08f))
+                    .background(palette.cyan.copy(alpha = if (input.isNotBlank()) 0.22f else 0.08f))
                     .testTag("ai_chat_send_button")
             ) {
-                Icon(Icons.AutoMirrored.Rounded.Send, contentDescription = "Send AI message", tint = NeonCyan)
+                Icon(Icons.AutoMirrored.Rounded.Send, contentDescription = "Send AI message", tint = palette.cyan)
             }
         }
     }
@@ -366,6 +362,7 @@ private fun GeminiVaultAndScheduleTab(
     onUpdateSchedule: (AiScheduleFrequency, Boolean, String) -> Unit,
     onRunDigestNow: () -> Unit
 ) {
+    val palette = LocalJrsPalette.current
     var apiKeyInput by remember { mutableStateOf("") }
     var showKey by remember { mutableStateOf(false) }
     var modelInput by remember(vaultConfig.geminiModel) { mutableStateOf(vaultConfig.geminiModel) }
@@ -387,16 +384,16 @@ private fun GeminiVaultAndScheduleTab(
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         item {
-            GlassCard(accentBorder = NeonCyan.copy(alpha = 0.4f)) {
+            GlassCard(accentBorder = palette.cyan.copy(alpha = 0.4f)) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text("Encrypted Gemini API Key Vault", style = MaterialTheme.typography.titleMedium, color = TextPrimary)
+                    Text("Encrypted Gemini API Key Vault", style = MaterialTheme.typography.titleMedium, color = palette.textPrimary)
                     NeonBadge(
                         text = if (vaultConfig.hasGeminiKey) "ENCRYPTED" else "NOT SET",
-                        color = if (vaultConfig.hasGeminiKey) CyberEmerald else AmberPulse
+                        color = if (vaultConfig.hasGeminiKey) palette.emerald else palette.amber
                     )
                 }
                 Spacer(Modifier.height(4.dp))
@@ -404,10 +401,10 @@ private fun GeminiVaultAndScheduleTab(
                     text = if (vaultConfig.hasGeminiKey) {
                         "Saved locally with Android Keystore AES-256-GCM (${vaultConfig.maskedGeminiKey})."
                     } else {
-                        "Enter your own Gemini API key. It is encrypted locally via Android Keystore and never transmitted except directly to Google Gemini."
+                        "Enter your own Gemini API key. It is encrypted locally via Android Keystore and sent directly to Google Gemini."
                     },
                     style = MaterialTheme.typography.bodySmall,
-                    color = TextSecondary
+                    color = palette.textSecondary
                 )
 
                 Spacer(Modifier.height(10.dp))
@@ -423,7 +420,7 @@ private fun GeminiVaultAndScheduleTab(
                             Icon(
                                 if (showKey) Icons.Rounded.VisibilityOff else Icons.Rounded.Visibility,
                                 contentDescription = "Toggle key visibility",
-                                tint = TextSecondary
+                                tint = palette.textSecondary
                             )
                         }
                     },
@@ -461,7 +458,7 @@ private fun GeminiVaultAndScheduleTab(
                             .weight(1f)
                             .heightIn(min = 48.dp)
                             .testTag("save_gemini_key_button"),
-                        colors = ButtonDefaults.buttonColors(containerColor = NeonCyan, contentColor = ObsidianVoid)
+                        colors = ButtonDefaults.buttonColors(containerColor = palette.cyan, contentColor = palette.onAccentButton)
                     ) {
                         Icon(Icons.Rounded.Key, contentDescription = null, modifier = Modifier.size(16.dp))
                         Spacer(Modifier.width(6.dp))
@@ -475,21 +472,21 @@ private fun GeminiVaultAndScheduleTab(
                             .heightIn(min = 48.dp)
                             .testTag("test_gemini_key_button")
                     ) {
-                        Text("Test Key", color = CyberEmerald)
+                        Text("Test Key", color = palette.emerald)
                     }
                 }
 
                 if (isBusy) {
                     Spacer(Modifier.height(10.dp))
-                    LinearProgressIndicator(modifier = Modifier.fillMaxWidth(), color = NeonCyan)
+                    LinearProgressIndicator(modifier = Modifier.fillMaxWidth(), color = palette.cyan)
                 }
 
                 if (keyValidationResult != null) {
                     Spacer(Modifier.height(10.dp))
                     val statusColor = when {
-                        keyValidationResult.fellBackFromCustom && keyValidationResult.success -> AmberPulse
-                        keyValidationResult.success -> CyberEmerald
-                        else -> AlertCrimson
+                        keyValidationResult.fellBackFromCustom && keyValidationResult.success -> palette.amber
+                        keyValidationResult.success -> palette.emerald
+                        else -> palette.crimson
                     }
                     Box(
                         modifier = Modifier
@@ -520,7 +517,7 @@ private fun GeminiVaultAndScheduleTab(
                             Text(
                                 text = keyValidationResult.statusMessage,
                                 style = MaterialTheme.typography.bodySmall,
-                                color = TextPrimary
+                                color = palette.textPrimary
                             )
                         }
                     }
@@ -529,12 +526,12 @@ private fun GeminiVaultAndScheduleTab(
         }
 
         item {
-            GlassCard(accentBorder = VioletNeural.copy(alpha = 0.4f)) {
-                Text("Automated AI Digest Schedule", style = MaterialTheme.typography.titleMedium, color = TextPrimary)
+            GlassCard(accentBorder = palette.violet.copy(alpha = 0.4f)) {
+                Text("Automated AI Digest Schedule", style = MaterialTheme.typography.titleMedium, color = palette.textPrimary)
                 Text(
                     text = "Uses compact privacy-filtered telemetry summaries to conserve free Gemini API quota.",
                     style = MaterialTheme.typography.bodySmall,
-                    color = TextSecondary
+                    color = palette.textSecondary
                 )
                 Spacer(Modifier.height(10.dp))
 
@@ -548,8 +545,8 @@ private fun GeminiVaultAndScheduleTab(
                             onClick = { selectedFreq = freq },
                             label = { Text(freq.label) },
                             colors = FilterChipDefaults.filterChipColors(
-                                selectedContainerColor = VioletNeural.copy(alpha = 0.25f),
-                                selectedLabelColor = TextPrimary
+                                selectedContainerColor = palette.violet.copy(alpha = 0.22f),
+                                selectedLabelColor = palette.textPrimary
                             ),
                             modifier = Modifier.testTag("schedule_chip_${freq.name.lowercase()}")
                         )
@@ -563,13 +560,13 @@ private fun GeminiVaultAndScheduleTab(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Column(modifier = Modifier.weight(1f)) {
-                        Text("Event-Triggered Critical Analysis", style = MaterialTheme.typography.titleSmall, color = TextPrimary)
-                        Text("Auto-analyze screen-off camera/mic alerts", style = MaterialTheme.typography.bodySmall, color = TextSecondary)
+                        Text("Event-Triggered Critical Analysis", style = MaterialTheme.typography.titleSmall, color = palette.textPrimary)
+                        Text("Auto-analyze screen-off camera/mic alerts", style = MaterialTheme.typography.bodySmall, color = palette.textSecondary)
                     }
                     Switch(
                         checked = eventTriggered,
                         onCheckedChange = { eventTriggered = it },
-                        colors = SwitchDefaults.colors(checkedThumbColor = ObsidianVoid, checkedTrackColor = NeonCyan)
+                        colors = SwitchDefaults.colors(checkedThumbColor = palette.onAccentButton, checkedTrackColor = palette.cyan)
                     )
                 }
 
@@ -584,7 +581,7 @@ private fun GeminiVaultAndScheduleTab(
                             .weight(1f)
                             .heightIn(min = 48.dp)
                             .testTag("apply_ai_schedule_button"),
-                        colors = ButtonDefaults.buttonColors(containerColor = VioletNeural, contentColor = Color.White)
+                        colors = ButtonDefaults.buttonColors(containerColor = palette.violet, contentColor = Color.White)
                     ) {
                         Icon(Icons.Rounded.Schedule, contentDescription = null, modifier = Modifier.size(16.dp))
                         Spacer(Modifier.width(6.dp))
@@ -598,9 +595,9 @@ private fun GeminiVaultAndScheduleTab(
                             .heightIn(min = 48.dp)
                             .testTag("run_ai_digest_now_button")
                     ) {
-                        Icon(Icons.Rounded.AutoAwesome, contentDescription = null, tint = NeonCyan, modifier = Modifier.size(16.dp))
+                        Icon(Icons.Rounded.AutoAwesome, contentDescription = null, tint = palette.cyan, modifier = Modifier.size(16.dp))
                         Spacer(Modifier.width(6.dp))
-                        Text("Run Now", color = NeonCyan)
+                        Text("Run Now", color = palette.cyan)
                     }
                 }
             }
@@ -608,24 +605,24 @@ private fun GeminiVaultAndScheduleTab(
 
         if (insights.isNotEmpty()) {
             item {
-                Text("Saved AI Security Digests (${insights.size})", style = MaterialTheme.typography.titleMedium, color = TextPrimary)
+                Text("Saved AI Security Digests (${insights.size})", style = MaterialTheme.typography.titleMedium, color = palette.textPrimary)
             }
             items(insights, key = { it.id }) { insight ->
-                GlassCard(accentBorder = CyberEmerald.copy(alpha = 0.35f)) {
+                GlassCard(accentBorder = palette.emerald.copy(alpha = 0.35f)) {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
-                        Text(insight.title, style = MaterialTheme.typography.titleSmall, color = NeonCyan)
-                        Text(TimeFormatter.formatDateTime(insight.createdAtMs), style = MaterialTheme.typography.labelSmall, color = TextMuted)
+                        Text(insight.title, style = MaterialTheme.typography.titleSmall, color = palette.cyan)
+                        Text(TimeFormatter.formatDateTime(insight.createdAtMs), style = MaterialTheme.typography.labelSmall, color = palette.textMuted)
                     }
                     Spacer(Modifier.height(6.dp))
-                    Text(insight.summaryText, style = MaterialTheme.typography.bodySmall, color = TextPrimary)
+                    Text(insight.summaryText, style = MaterialTheme.typography.bodySmall, color = palette.textPrimary)
                     Spacer(Modifier.height(6.dp))
                     Text(
                         text = "${insight.eventsAnalyzed} events • ${insight.quotaSavedNote}",
                         style = MaterialTheme.typography.labelSmall,
-                        color = CyberEmerald
+                        color = palette.emerald
                     )
                 }
             }
@@ -638,10 +635,12 @@ private fun ReleasesAndAboutTab(
     vaultConfig: VaultConfig,
     githubRelease: GitHubReleaseInfo?,
     isChecking: Boolean,
+    onSetThemeMode: (AppThemeMode) -> Unit,
     onCheckRelease: (String, String) -> Unit,
     onDownloadApk: (GitHubReleaseInfo) -> Unit,
     onOpenOfficialWebsite: () -> Unit
 ) {
+    val palette = LocalJrsPalette.current
     var owner by remember(vaultConfig.githubOwner) { mutableStateOf(vaultConfig.githubOwner) }
     var repo by remember(vaultConfig.githubRepo) { mutableStateOf(vaultConfig.githubRepo) }
 
@@ -651,7 +650,7 @@ private fun ReleasesAndAboutTab(
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         item {
-            GlassCard(accentBorder = NeonCyan.copy(alpha = 0.45f)) {
+            GlassCard(accentBorder = palette.cyan.copy(alpha = 0.45f)) {
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(14.dp)
@@ -661,18 +660,18 @@ private fun ReleasesAndAboutTab(
                         Text(
                             text = "JRS AI Guard",
                             style = MaterialTheme.typography.headlineSmall,
-                            color = TextPrimary,
+                            color = palette.textPrimary,
                             fontWeight = FontWeight.Bold
                         )
                         Text(
-                            text = "Version ${BuildConfig.VERSION_NAME} (${BuildConfig.APPLICATION_ID})",
+                            text = "Version ${BuildConfig.VERSION_NAME} • Security Suite",
                             style = MaterialTheme.typography.labelMedium,
-                            color = NeonCyan
+                            color = palette.cyan
                         )
                         Text(
                             text = "Developed by Md Jakariya Hasan",
                             style = MaterialTheme.typography.bodySmall,
-                            color = TextSecondary
+                            color = palette.textSecondary
                         )
                     }
                 }
@@ -686,16 +685,54 @@ private fun ReleasesAndAboutTab(
         }
 
         item {
-            GlassCard(accentBorder = CyberEmerald.copy(alpha = 0.4f)) {
+            GlassCard(accentBorder = palette.violet.copy(alpha = 0.4f)) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Icon(Icons.Rounded.Palette, contentDescription = null, tint = palette.violet, modifier = Modifier.size(18.dp))
+                    Text("Appearance & Theme", style = MaterialTheme.typography.titleMedium, color = palette.textPrimary)
+                }
+                Spacer(Modifier.height(4.dp))
+                Text(
+                    text = "Switch between Dark Obsidian, Light Frost, or follow Android System theme.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = palette.textSecondary
+                )
+                Spacer(Modifier.height(10.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    AppThemeMode.entries.forEach { mode ->
+                        FilterChip(
+                            selected = vaultConfig.themeMode == mode,
+                            onClick = { onSetThemeMode(mode) },
+                            label = { Text(mode.label) },
+                            colors = FilterChipDefaults.filterChipColors(
+                                selectedContainerColor = palette.cyan.copy(alpha = 0.2f),
+                                selectedLabelColor = palette.cyan
+                            ),
+                            modifier = Modifier
+                                .weight(1f)
+                                .testTag("theme_chip_${mode.name.lowercase()}")
+                        )
+                    }
+                }
+            }
+        }
+
+        item {
+            GlassCard(accentBorder = palette.emerald.copy(alpha = 0.4f)) {
                 Text(
                     text = "GitHub Releases APK Updater",
                     style = MaterialTheme.typography.titleMedium,
-                    color = TextPrimary
+                    color = palette.textPrimary
                 )
                 Text(
                     text = "Checks GitHub Releases API for signed APK builds and downloads directly via Android DownloadManager.",
                     style = MaterialTheme.typography.bodySmall,
-                    color = TextSecondary
+                    color = palette.textSecondary
                 )
 
                 Spacer(Modifier.height(10.dp))
@@ -727,7 +764,7 @@ private fun ReleasesAndAboutTab(
                         .fillMaxWidth()
                         .heightIn(min = 48.dp)
                         .testTag("check_github_release_button"),
-                    colors = ButtonDefaults.buttonColors(containerColor = CyberEmerald, contentColor = ObsidianVoid)
+                    colors = ButtonDefaults.buttonColors(containerColor = palette.emerald, contentColor = palette.onAccentButton)
                 ) {
                     Icon(Icons.Rounded.SystemUpdate, contentDescription = null, modifier = Modifier.size(18.dp))
                     Spacer(Modifier.width(8.dp))
@@ -736,18 +773,18 @@ private fun ReleasesAndAboutTab(
 
                 if (isChecking) {
                     Spacer(Modifier.height(8.dp))
-                    LinearProgressIndicator(modifier = Modifier.fillMaxWidth(), color = CyberEmerald)
+                    LinearProgressIndicator(modifier = Modifier.fillMaxWidth(), color = palette.emerald)
                 }
 
                 if (githubRelease != null) {
                     Spacer(Modifier.height(12.dp))
                     NeonBadge(
                         text = if (githubRelease.isUpdateAvailable) "UPDATE AVAILABLE: ${githubRelease.tagName}" else "LATEST: ${githubRelease.tagName}",
-                        color = if (githubRelease.isUpdateAvailable) AmberPulse else CyberEmerald
+                        color = if (githubRelease.isUpdateAvailable) palette.amber else palette.emerald
                     )
                     Spacer(Modifier.height(6.dp))
-                    Text(githubRelease.releaseName, style = MaterialTheme.typography.titleSmall, color = TextPrimary)
-                    Text(githubRelease.body, style = MaterialTheme.typography.bodySmall, color = TextSecondary, maxLines = 5)
+                    Text(githubRelease.releaseName, style = MaterialTheme.typography.titleSmall, color = palette.textPrimary)
+                    Text(githubRelease.body, style = MaterialTheme.typography.bodySmall, color = palette.textSecondary, maxLines = 5)
                     Spacer(Modifier.height(10.dp))
                     OutlinedButton(
                         onClick = { onDownloadApk(githubRelease) },
@@ -755,9 +792,9 @@ private fun ReleasesAndAboutTab(
                             .fillMaxWidth()
                             .heightIn(min = 48.dp)
                             .testTag("download_release_apk_button"),
-                        border = BorderStroke(1.dp, NeonCyan)
+                        border = BorderStroke(1.dp, palette.cyan)
                     ) {
-                        Icon(Icons.Rounded.CloudDownload, contentDescription = null, tint = NeonCyan, modifier = Modifier.size(18.dp))
+                        Icon(Icons.Rounded.CloudDownload, contentDescription = null, tint = palette.cyan, modifier = Modifier.size(18.dp))
                         Spacer(Modifier.width(8.dp))
                         Text(
                             text = if (githubRelease.apkAssetName != null) {
@@ -765,7 +802,7 @@ private fun ReleasesAndAboutTab(
                             } else {
                                 "Open GitHub Release Page"
                             },
-                            color = NeonCyan
+                            color = palette.cyan
                         )
                     }
                 }

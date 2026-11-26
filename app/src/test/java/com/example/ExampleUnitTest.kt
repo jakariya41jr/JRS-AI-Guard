@@ -1,8 +1,10 @@
 package com.example
 
 import com.example.data.ai.GeminiClient
+import com.example.security.AppThemeMode
 import com.example.util.TimeFormatter
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -32,5 +34,22 @@ class ExampleUnitTest {
 
         val proOnly = listOf("models/gemini-1.5-pro", "models/gemini-2.5-pro")
         assertEquals("gemini-2.5-pro", GeminiClient.selectPreferredModel(proOnly))
+    }
+
+    @Test
+    fun gemini_topic_and_creator_detection_supports_bengali_and_english() {
+        assertTrue(GeminiClient.isLikelyOnTopic("আমার ফোনে কোন অ্যাপ ক্যামেরা ব্যবহার করছে?"))
+        assertTrue(GeminiClient.isLikelyOnTopic("রুট মোডে নিরাপত্তা অবস্থা কেমন?"))
+        assertTrue(GeminiClient.isLikelyOnTopic("Why did camera access spike overnight?"))
+        assertFalse(GeminiClient.isLikelyOnTopic("Write me a chicken biryani cooking recipe for dinner tonight"))
+
+        assertTrue(GeminiClient.isCreatorQuestion("JRS AI Guard কে বানিয়েছে?"))
+        assertTrue(GeminiClient.isCreatorQuestion("Who created this security app?"))
+        assertFalse(GeminiClient.isCreatorQuestion("Check my microphone timeline"))
+    }
+
+    @Test
+    fun app_theme_modes_expose_all_options() {
+        assertEquals(listOf(AppThemeMode.DARK, AppThemeMode.LIGHT, AppThemeMode.SYSTEM), AppThemeMode.entries)
     }
 }

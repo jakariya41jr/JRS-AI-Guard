@@ -43,13 +43,7 @@ import com.example.data.local.TimelineEventEntity
 import com.example.ui.components.GlassCard
 import com.example.ui.components.NeonBadge
 import com.example.ui.components.severityColor
-import com.example.ui.theme.AlertCrimson
-import com.example.ui.theme.AmberPulse
-import com.example.ui.theme.CyberEmerald
-import com.example.ui.theme.NeonCyan
-import com.example.ui.theme.TextMuted
-import com.example.ui.theme.TextPrimary
-import com.example.ui.theme.TextSecondary
+import com.example.ui.theme.LocalJrsPalette
 import com.example.util.TimeFormatter
 
 @Composable
@@ -59,6 +53,7 @@ fun TimelineScreen(
     onSelectCategory: (EventCategory?) -> Unit,
     onQuickActions: (String, String) -> Unit
 ) {
+    val palette = LocalJrsPalette.current
     var onlyHighSeverity by remember { mutableStateOf(false) }
 
     val filtered = remember(events, selectedCategory, onlyHighSeverity) {
@@ -80,12 +75,12 @@ fun TimelineScreen(
                     Text(
                         text = "Watchdog Timeline & Leases",
                         style = MaterialTheme.typography.headlineSmall,
-                        color = TextPrimary
+                        color = palette.textPrimary
                     )
                     Text(
                         text = "Exact start/end timestamps & active durations across all monitors",
                         style = MaterialTheme.typography.bodySmall,
-                        color = TextSecondary
+                        color = palette.textSecondary
                     )
                 }
                 FilterChip(
@@ -96,8 +91,8 @@ fun TimelineScreen(
                         Icon(Icons.Rounded.Tune, contentDescription = null, modifier = Modifier.size(16.dp))
                     },
                     colors = FilterChipDefaults.filterChipColors(
-                        selectedContainerColor = AlertCrimson.copy(alpha = 0.2f),
-                        selectedLabelColor = AlertCrimson
+                        selectedContainerColor = palette.crimson.copy(alpha = 0.18f),
+                        selectedLabelColor = palette.crimson
                     ),
                     modifier = Modifier.testTag("timeline_alerts_only_chip")
                 )
@@ -114,8 +109,8 @@ fun TimelineScreen(
                         onClick = { onSelectCategory(null) },
                         label = { Text("All (${events.size})") },
                         colors = FilterChipDefaults.filterChipColors(
-                            selectedContainerColor = NeonCyan.copy(alpha = 0.2f),
-                            selectedLabelColor = NeonCyan
+                            selectedContainerColor = palette.cyan.copy(alpha = 0.18f),
+                            selectedLabelColor = palette.cyan
                         ),
                         modifier = Modifier.testTag("filter_all")
                     )
@@ -127,8 +122,8 @@ fun TimelineScreen(
                         onClick = { onSelectCategory(cat) },
                         label = { Text("${cat.displayName} ($count)") },
                         colors = FilterChipDefaults.filterChipColors(
-                            selectedContainerColor = NeonCyan.copy(alpha = 0.2f),
-                            selectedLabelColor = NeonCyan
+                            selectedContainerColor = palette.cyan.copy(alpha = 0.18f),
+                            selectedLabelColor = palette.cyan
                         ),
                         modifier = Modifier.testTag("filter_${cat.name.lowercase()}")
                     )
@@ -141,7 +136,7 @@ fun TimelineScreen(
                 Text(
                     text = "No timeline entries match the current filter. Enable Watchdog Service or refresh telemetry to capture live permission, sensor, root, and resource events.",
                     style = MaterialTheme.typography.bodyMedium,
-                    color = TextSecondary
+                    color = palette.textSecondary
                 )
             }
         } else {
@@ -165,21 +160,21 @@ fun TimelineScreen(
                                 Text(
                                     text = ev.appName,
                                     style = MaterialTheme.typography.titleMedium,
-                                    color = TextPrimary,
+                                    color = palette.textPrimary,
                                     maxLines = 1,
                                     overflow = TextOverflow.Ellipsis
                                 )
                                 Text(
                                     text = ev.packageName,
                                     style = MaterialTheme.typography.labelSmall,
-                                    color = TextMuted,
+                                    color = palette.textMuted,
                                     maxLines = 1,
                                     overflow = TextOverflow.Ellipsis
                                 )
                             }
                             Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                                 if (ev.isScreenOff) {
-                                    NeonBadge(text = "SCREEN OFF", color = AlertCrimson)
+                                    NeonBadge(text = "SCREEN OFF", color = palette.crimson)
                                 }
                                 NeonBadge(text = ev.permissionOrResource, color = sevColor)
                             }
@@ -189,17 +184,16 @@ fun TimelineScreen(
                         Text(
                             text = ev.actionTitle,
                             style = MaterialTheme.typography.titleSmall,
-                            color = NeonCyan
+                            color = palette.cyan
                         )
                         Text(
                             text = ev.detail,
                             style = MaterialTheme.typography.bodySmall,
-                            color = TextSecondary
+                            color = palette.textSecondary
                         )
 
                         Spacer(Modifier.height(10.dp))
 
-                        // Timestamp & Duration Strip
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.SpaceBetween,
@@ -209,28 +203,28 @@ fun TimelineScreen(
                                 Icon(
                                     Icons.Rounded.Schedule,
                                     contentDescription = "Timestamp",
-                                    tint = NeonCyan,
+                                    tint = palette.cyan,
                                     modifier = Modifier.size(15.dp)
                                 )
                                 Spacer(Modifier.width(4.dp))
                                 Text(
                                     text = "${TimeFormatter.formatShortTime(ev.startTimeMs)} → ${TimeFormatter.formatShortTime(ev.endTimeMs)}",
                                     style = MaterialTheme.typography.labelMedium,
-                                    color = TextPrimary
+                                    color = palette.textPrimary
                                 )
                             }
                             Row(verticalAlignment = Alignment.CenterVertically) {
                                 Icon(
                                     Icons.Rounded.AccessTime,
                                     contentDescription = "Active duration",
-                                    tint = CyberEmerald,
+                                    tint = palette.emerald,
                                     modifier = Modifier.size(15.dp)
                                 )
                                 Spacer(Modifier.width(4.dp))
                                 Text(
                                     text = TimeFormatter.formatDuration(ev.durationMs),
                                     style = MaterialTheme.typography.labelMedium,
-                                    color = CyberEmerald
+                                    color = palette.emerald
                                 )
                             }
                         }
@@ -243,19 +237,19 @@ fun TimelineScreen(
                             ) {
                                 if (ev.cpuPercent > 0f) {
                                     Row(verticalAlignment = Alignment.CenterVertically) {
-                                        Icon(Icons.Rounded.Memory, contentDescription = null, tint = AmberPulse, modifier = Modifier.size(14.dp))
+                                        Icon(Icons.Rounded.Memory, contentDescription = null, tint = palette.amber, modifier = Modifier.size(14.dp))
                                         Spacer(Modifier.width(4.dp))
-                                        Text("CPU ${ev.cpuPercent.toInt()}% • ${ev.ramMb.toInt()}MB", style = MaterialTheme.typography.labelSmall, color = AmberPulse)
+                                        Text("CPU ${ev.cpuPercent.toInt()}% • ${ev.ramMb.toInt()}MB", style = MaterialTheme.typography.labelSmall, color = palette.amber)
                                     }
                                 }
                                 if (ev.batteryPercentDrain > 0f) {
                                     Row(verticalAlignment = Alignment.CenterVertically) {
-                                        Icon(Icons.Rounded.BatteryAlert, contentDescription = null, tint = AlertCrimson, modifier = Modifier.size(14.dp))
+                                        Icon(Icons.Rounded.BatteryAlert, contentDescription = null, tint = palette.crimson, modifier = Modifier.size(14.dp))
                                         Spacer(Modifier.width(4.dp))
                                         Text(
                                             String.format("~%.1f%% battery", ev.batteryPercentDrain),
                                             style = MaterialTheme.typography.labelSmall,
-                                            color = AlertCrimson
+                                            color = palette.crimson
                                         )
                                     }
                                 }
@@ -270,9 +264,9 @@ fun TimelineScreen(
                                 .heightIn(min = 48.dp)
                                 .testTag("quick_action_btn_${ev.id}")
                         ) {
-                            Icon(Icons.Rounded.Bolt, contentDescription = null, tint = NeonCyan, modifier = Modifier.size(16.dp))
+                            Icon(Icons.Rounded.Bolt, contentDescription = null, tint = palette.cyan, modifier = Modifier.size(16.dp))
                             Spacer(Modifier.width(6.dp))
-                            Text("Quick Actions (Stop / Freeze / Revoke / Trust)", color = NeonCyan)
+                            Text("Quick Actions (Stop / Freeze / Revoke / Trust)", color = palette.cyan)
                         }
                     }
                 }

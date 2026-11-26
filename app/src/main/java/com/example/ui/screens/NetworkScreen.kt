@@ -33,20 +33,14 @@ import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.example.data.local.NetworkSessionEntity
 import com.example.ui.components.GlassCard
 import com.example.ui.components.NeonBadge
-import com.example.ui.theme.AlertCrimson
-import com.example.ui.theme.AmberPulse
-import com.example.ui.theme.CyberEmerald
-import com.example.ui.theme.ElectricBlue
-import com.example.ui.theme.NeonCyan
-import com.example.ui.theme.TextMuted
-import com.example.ui.theme.TextPrimary
-import com.example.ui.theme.TextSecondary
+import com.example.ui.theme.LocalJrsPalette
 import com.example.util.TimeFormatter
 
 @Composable
@@ -56,6 +50,7 @@ fun NetworkScreen(
     onToggleBlock: (Int, String, Boolean) -> Unit,
     onQuickActions: (String, String) -> Unit
 ) {
+    val palette = LocalJrsPalette.current
     val totalUp = sessions.sumOf { it.uploadBytes }
     val totalDown = sessions.sumOf { it.downloadBytes }
     val spikeCount = sessions.count { it.isSpike }
@@ -66,7 +61,7 @@ fun NetworkScreen(
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         item {
-            GlassCard(accentBorder = NeonCyan.copy(alpha = 0.4f)) {
+            GlassCard(accentBorder = palette.cyan.copy(alpha = 0.4f)) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
@@ -76,17 +71,17 @@ fun NetworkScreen(
                         Text(
                             text = "Network Session & Data Spike Timeline",
                             style = MaterialTheme.typography.titleMedium,
-                            color = TextPrimary
+                            color = palette.textPrimary
                         )
                         Text(
                             text = if (isRootActive) "Root netpolicy/iptables firewall enabled" else "Non-Root TrafficStats & /proc/net socket view",
                             style = MaterialTheme.typography.bodySmall,
-                            color = TextSecondary
+                            color = palette.textSecondary
                         )
                     }
                     NeonBadge(
                         text = "$spikeCount SPIKES",
-                        color = if (spikeCount > 0) AlertCrimson else CyberEmerald
+                        color = if (spikeCount > 0) palette.crimson else palette.emerald
                     )
                 }
 
@@ -97,22 +92,25 @@ fun NetworkScreen(
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(Icons.Rounded.ArrowUpward, contentDescription = "Upload", tint = AmberPulse, modifier = Modifier.size(16.dp))
+                        Icon(Icons.Rounded.ArrowUpward, contentDescription = "Upload", tint = palette.amber, modifier = Modifier.size(16.dp))
                         Spacer(Modifier.width(4.dp))
-                        Text("Total Up: ${TimeFormatter.formatBytes(totalUp)}", style = MaterialTheme.typography.labelMedium, color = AmberPulse)
+                        Text("Total Up: ${TimeFormatter.formatBytes(totalUp)}", style = MaterialTheme.typography.labelMedium, color = palette.amber)
                     }
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(Icons.Rounded.ArrowDownward, contentDescription = "Download", tint = NeonCyan, modifier = Modifier.size(16.dp))
+                        Icon(Icons.Rounded.ArrowDownward, contentDescription = "Download", tint = palette.cyan, modifier = Modifier.size(16.dp))
                         Spacer(Modifier.width(4.dp))
-                        Text("Total Down: ${TimeFormatter.formatBytes(totalDown)}", style = MaterialTheme.typography.labelMedium, color = NeonCyan)
+                        Text("Total Down: ${TimeFormatter.formatBytes(totalDown)}", style = MaterialTheme.typography.labelMedium, color = palette.cyan)
                     }
                 }
 
                 Spacer(Modifier.height(12.dp))
 
-                // Custom Jetpack Compose Canvas Spike Visualizer
                 NetworkSpikeChart(
                     sessions = sessions.take(12),
+                    cyanColor = palette.cyan,
+                    blueColor = palette.blue,
+                    crimsonColor = palette.crimson,
+                    amberColor = palette.amber,
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(110.dp)
@@ -126,16 +124,16 @@ fun NetworkScreen(
                     Text(
                         text = "No per-app traffic sessions recorded yet. Grant Usage Access or trigger a telemetry refresh to inspect upload/download spikes and remote endpoints.",
                         style = MaterialTheme.typography.bodyMedium,
-                        color = TextSecondary
+                        color = palette.textSecondary
                     )
                 }
             }
         } else {
             items(sessions, key = { it.id }) { session ->
                 val accent = when {
-                    session.isBlocked -> AlertCrimson
-                    session.isSpike -> AmberPulse
-                    else -> ElectricBlue
+                    session.isBlocked -> palette.crimson
+                    session.isSpike -> palette.amber
+                    else -> palette.blue
                 }
                 GlassCard(
                     accentBorder = accent.copy(alpha = 0.4f),
@@ -151,21 +149,21 @@ fun NetworkScreen(
                             Text(
                                 text = session.appName,
                                 style = MaterialTheme.typography.titleMedium,
-                                color = TextPrimary,
+                                color = palette.textPrimary,
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis
                             )
                             Text(
                                 text = session.packageName,
                                 style = MaterialTheme.typography.labelSmall,
-                                color = TextMuted,
+                                color = palette.textMuted,
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis
                             )
                         }
                         Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                            if (session.isSpike) NeonBadge(text = "SPIKE", color = AlertCrimson)
-                            if (session.isBlocked) NeonBadge(text = "BLOCKED", color = AlertCrimson)
+                            if (session.isSpike) NeonBadge(text = "SPIKE", color = palette.crimson)
+                            if (session.isBlocked) NeonBadge(text = "BLOCKED", color = palette.crimson)
                         }
                     }
 
@@ -177,23 +175,23 @@ fun NetworkScreen(
                         Text(
                             text = "↑ ${TimeFormatter.formatBytes(session.uploadBytes)}  •  ↓ ${TimeFormatter.formatBytes(session.downloadBytes)}",
                             style = MaterialTheme.typography.labelMedium,
-                            color = NeonCyan
+                            color = palette.cyan
                         )
                         Text(
                             text = TimeFormatter.formatDuration(session.durationMs),
                             style = MaterialTheme.typography.labelSmall,
-                            color = CyberEmerald
+                            color = palette.emerald
                         )
                     }
 
                     Spacer(Modifier.height(6.dp))
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(Icons.Rounded.Router, contentDescription = null, tint = TextSecondary, modifier = Modifier.size(15.dp))
+                        Icon(Icons.Rounded.Router, contentDescription = null, tint = palette.textSecondary, modifier = Modifier.size(15.dp))
                         Spacer(Modifier.width(6.dp))
                         Text(
                             text = "${session.protocol} • ${session.endpoint} • ${TimeFormatter.formatShortTime(session.endTimeMs)}",
                             style = MaterialTheme.typography.bodySmall,
-                            color = TextSecondary,
+                            color = palette.textSecondary,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis
                         )
@@ -208,13 +206,13 @@ fun NetworkScreen(
                             .testTag("net_block_btn_${session.id}"),
                         border = BorderStroke(
                             1.dp,
-                            if (session.isBlocked) CyberEmerald else AlertCrimson.copy(alpha = 0.6f)
+                            if (session.isBlocked) palette.emerald else palette.crimson.copy(alpha = 0.6f)
                         )
                     ) {
                         Icon(
                             imageVector = if (session.isBlocked) Icons.Rounded.CheckCircle else Icons.Rounded.Block,
                             contentDescription = null,
-                            tint = if (session.isBlocked) CyberEmerald else AlertCrimson,
+                            tint = if (session.isBlocked) palette.emerald else palette.crimson,
                             modifier = Modifier.size(16.dp)
                         )
                         Spacer(Modifier.width(6.dp))
@@ -226,7 +224,7 @@ fun NetworkScreen(
                             } else {
                                 "Flag & Block in Watchlist"
                             },
-                            color = if (session.isBlocked) CyberEmerald else AlertCrimson
+                            color = if (session.isBlocked) palette.emerald else palette.crimson
                         )
                     }
                 }
@@ -238,6 +236,10 @@ fun NetworkScreen(
 @Composable
 private fun NetworkSpikeChart(
     sessions: List<NetworkSessionEntity>,
+    cyanColor: Color,
+    blueColor: Color,
+    crimsonColor: Color,
+    amberColor: Color,
     modifier: Modifier = Modifier
 ) {
     Canvas(modifier = modifier) {
@@ -255,9 +257,9 @@ private fun NetworkSpikeChart(
             val y = size.height - barH
 
             val barBrush = if (s.isSpike) {
-                Brush.verticalGradient(listOf(AlertCrimson, AmberPulse))
+                Brush.verticalGradient(listOf(crimsonColor, amberColor))
             } else {
-                Brush.verticalGradient(listOf(NeonCyan, ElectricBlue))
+                Brush.verticalGradient(listOf(cyanColor, blueColor))
             }
 
             drawRoundRect(

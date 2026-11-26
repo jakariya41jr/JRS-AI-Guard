@@ -27,8 +27,6 @@ import androidx.compose.material.icons.rounded.FileOpen
 import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material.icons.rounded.Security
 import androidx.compose.material.icons.rounded.Share
-import androidx.compose.material.icons.rounded.Shield
-import androidx.compose.material.icons.rounded.VerifiedUser
 import androidx.compose.material.icons.rounded.Warning
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -51,9 +49,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.example.data.export.ExportFormat
@@ -67,16 +63,7 @@ import com.example.ui.components.GlassCard
 import com.example.ui.components.NeonBadge
 import com.example.ui.components.severityColor
 import com.example.ui.components.trustColor
-import com.example.ui.theme.AlertCrimson
-import com.example.ui.theme.AmberPulse
-import com.example.ui.theme.CyberEmerald
-import com.example.ui.theme.GlassStroke
-import com.example.ui.theme.NeonCyan
-import com.example.ui.theme.ObsidianDeep
-import com.example.ui.theme.ObsidianVoid
-import com.example.ui.theme.TextMuted
-import com.example.ui.theme.TextPrimary
-import com.example.ui.theme.TextSecondary
+import com.example.ui.theme.LocalJrsPalette
 import com.example.util.TimeFormatter
 
 @Composable
@@ -95,6 +82,7 @@ fun ScannerAuditScreen(
     onShareReport: (ExportFormat) -> Unit,
     onSaveReportFile: (ExportFormat) -> Unit
 ) {
+    val palette = LocalJrsPalette.current
     var selectedTab by remember { mutableIntStateOf(0) }
     val tabs = listOf("APK Scanner", "App Auditor", "Integrity & Export")
 
@@ -107,12 +95,12 @@ fun ScannerAuditScreen(
     Column(modifier = Modifier.fillMaxSize()) {
         TabRow(
             selectedTabIndex = selectedTab,
-            containerColor = ObsidianDeep,
-            contentColor = NeonCyan,
+            containerColor = palette.navBar,
+            contentColor = palette.cyan,
             indicator = { tabPositions ->
                 TabRowDefaults.SecondaryIndicator(
                     modifier = Modifier.tabIndicatorOffset(tabPositions[selectedTab]),
-                    color = NeonCyan
+                    color = palette.cyan
                 )
             }
         ) {
@@ -168,13 +156,14 @@ private fun MalwareScannerTab(
     onPickFile: () -> Unit,
     onScanInstalledApp: (String, String) -> Unit
 ) {
+    val palette = LocalJrsPalette.current
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         item {
-            GlassCard(accentBorder = NeonCyan.copy(alpha = 0.4f)) {
+            GlassCard(accentBorder = palette.cyan.copy(alpha = 0.4f)) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
@@ -184,17 +173,17 @@ private fun MalwareScannerTab(
                         Text(
                             text = "Free API Malware & APK Scanner",
                             style = MaterialTheme.typography.titleMedium,
-                            color = TextPrimary
+                            color = palette.textPrimary
                         )
                         Text(
                             text = "Computes SHA-256 hash locally, checks 24h cache first, and queries MalwareBazaar free threat intel.",
                             style = MaterialTheme.typography.bodySmall,
-                            color = TextSecondary
+                            color = palette.textSecondary
                         )
                     }
                     NeonBadge(
                         text = "$conservedCalls QUOTA SAVED",
-                        color = CyberEmerald
+                        color = palette.emerald
                     )
                 }
 
@@ -206,8 +195,8 @@ private fun MalwareScannerTab(
                         .heightIn(min = 48.dp)
                         .testTag("pick_file_scan_button"),
                     colors = ButtonDefaults.buttonColors(
-                        containerColor = NeonCyan,
-                        contentColor = ObsidianVoid
+                        containerColor = palette.cyan,
+                        contentColor = palette.onAccentButton
                     ),
                     shape = RoundedCornerShape(14.dp)
                 ) {
@@ -220,8 +209,8 @@ private fun MalwareScannerTab(
                     Spacer(Modifier.height(10.dp))
                     LinearProgressIndicator(
                         modifier = Modifier.fillMaxWidth(),
-                        color = NeonCyan,
-                        trackColor = Color.White.copy(alpha = 0.08f)
+                        color = palette.cyan,
+                        trackColor = palette.trackMuted
                     )
                 }
             }
@@ -231,9 +220,9 @@ private fun MalwareScannerTab(
             item {
                 val res = lastScan.entity
                 val color = when (res.verdict) {
-                    "MALICIOUS" -> AlertCrimson
-                    "SUSPICIOUS" -> AmberPulse
-                    else -> CyberEmerald
+                    "MALICIOUS" -> palette.crimson
+                    "SUSPICIOUS" -> palette.amber
+                    else -> palette.emerald
                 }
                 GlassCard(accentBorder = color.copy(alpha = 0.6f)) {
                     Row(
@@ -244,18 +233,18 @@ private fun MalwareScannerTab(
                         Text(
                             text = "Latest Scan Result",
                             style = MaterialTheme.typography.titleSmall,
-                            color = TextPrimary
+                            color = palette.textPrimary
                         )
                         Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                             if (lastScan.fromCache) {
-                                NeonBadge(text = "CACHE HIT", color = NeonCyan)
+                                NeonBadge(text = "CACHE HIT", color = palette.cyan)
                             }
                             NeonBadge(text = res.verdict, color = color)
                         }
                     }
                     Spacer(Modifier.height(6.dp))
-                    Text(res.targetName, style = MaterialTheme.typography.titleMedium, color = TextPrimary)
-                    Text("SHA-256: ${res.sha256}", style = MaterialTheme.typography.labelSmall, color = TextMuted)
+                    Text(res.targetName, style = MaterialTheme.typography.titleMedium, color = palette.textPrimary)
+                    Text("SHA-256: ${res.sha256}", style = MaterialTheme.typography.labelSmall, color = palette.textMuted)
                     Spacer(Modifier.height(6.dp))
                     Text(
                         text = "${res.sourceApi} • ${res.detectionRatio}",
@@ -266,13 +255,13 @@ private fun MalwareScannerTab(
                         Text(
                             text = "Threat Family: ${res.threatFamily}",
                             style = MaterialTheme.typography.bodySmall,
-                            color = AlertCrimson
+                            color = palette.crimson
                         )
                     }
                     Text(
                         text = "Static Heuristic (${res.heuristicScore}/100): ${res.heuristicFlags}",
                         style = MaterialTheme.typography.bodySmall,
-                        color = TextSecondary
+                        color = palette.textSecondary
                     )
                 }
             }
@@ -282,7 +271,7 @@ private fun MalwareScannerTab(
             Text(
                 text = "Scan Installed App APKs",
                 style = MaterialTheme.typography.titleMedium,
-                color = TextPrimary
+                color = palette.textPrimary
             )
         }
 
@@ -297,17 +286,17 @@ private fun MalwareScannerTab(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Column(modifier = Modifier.weight(1f)) {
-                        Text(app.appName, style = MaterialTheme.typography.titleSmall, color = TextPrimary)
+                        Text(app.appName, style = MaterialTheme.typography.titleSmall, color = palette.textPrimary)
                         Text(
                             text = "${app.packageName} • Risk ${app.riskScore}/100",
                             style = MaterialTheme.typography.labelSmall,
-                            color = TextSecondary,
+                            color = palette.textSecondary,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis
                         )
                     }
                     Spacer(Modifier.width(8.dp))
-                    Icon(Icons.Rounded.BugReport, contentDescription = "Scan APK", tint = NeonCyan)
+                    Icon(Icons.Rounded.BugReport, contentDescription = "Scan APK", tint = palette.cyan)
                 }
             }
         }
@@ -317,11 +306,11 @@ private fun MalwareScannerTab(
                 Text(
                     text = "Cached SHA-256 Scan History (${scanHistory.size})",
                     style = MaterialTheme.typography.titleMedium,
-                    color = TextPrimary
+                    color = palette.textPrimary
                 )
             }
             items(scanHistory.take(15), key = { it.sha256 }) { item ->
-                val color = if (item.verdict == "CLEAN") CyberEmerald else AlertCrimson
+                val color = if (item.verdict == "CLEAN") palette.emerald else palette.crimson
                 GlassCard {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
@@ -330,7 +319,7 @@ private fun MalwareScannerTab(
                         Text(
                             item.targetName,
                             style = MaterialTheme.typography.titleSmall,
-                            color = TextPrimary,
+                            color = palette.textPrimary,
                             modifier = Modifier.weight(1f)
                         )
                         NeonBadge(text = item.verdict, color = color)
@@ -338,7 +327,7 @@ private fun MalwareScannerTab(
                     Text(
                         text = "SHA-256: ${item.sha256.take(24)}… • ${TimeFormatter.formatDateTime(item.scannedAtMs)}",
                         style = MaterialTheme.typography.labelSmall,
-                        color = TextMuted
+                        color = palette.textMuted
                     )
                 }
             }
@@ -351,6 +340,7 @@ private fun AppTrustAuditorTab(
     apps: List<AppTrustEntity>,
     onOpenQuickActions: (String, String) -> Unit
 ) {
+    val palette = LocalJrsPalette.current
     var query by remember { mutableStateOf("") }
     val filtered = remember(apps, query) {
         if (query.isBlank()) apps
@@ -365,13 +355,13 @@ private fun AppTrustAuditorTab(
             value = query,
             onValueChange = { query = it },
             placeholder = { Text("Filter installed & sideloaded apps…") },
-            leadingIcon = { Icon(Icons.Rounded.Search, contentDescription = null, tint = NeonCyan) },
+            leadingIcon = { Icon(Icons.Rounded.Search, contentDescription = null, tint = palette.cyan) },
             singleLine = true,
             colors = OutlinedTextFieldDefaults.colors(
-                focusedBorderColor = NeonCyan,
-                unfocusedBorderColor = GlassStroke,
-                focusedTextColor = TextPrimary,
-                unfocusedTextColor = TextPrimary
+                focusedBorderColor = palette.cyan,
+                unfocusedBorderColor = palette.glassStroke,
+                focusedTextColor = palette.textPrimary,
+                unfocusedTextColor = palette.textPrimary
             ),
             modifier = Modifier
                 .fillMaxWidth()
@@ -387,9 +377,9 @@ private fun AppTrustAuditorTab(
             items(filtered, key = { it.packageName }) { app ->
                 val tColor = trustColor(app.trustLevel)
                 val rColor = when {
-                    app.riskScore >= 65 -> AlertCrimson
-                    app.riskScore >= 40 -> AmberPulse
-                    else -> CyberEmerald
+                    app.riskScore >= 65 -> palette.crimson
+                    app.riskScore >= 40 -> palette.amber
+                    else -> palette.emerald
                 }
                 GlassCard(
                     accentBorder = rColor.copy(alpha = 0.35f),
@@ -402,12 +392,12 @@ private fun AppTrustAuditorTab(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Column(modifier = Modifier.weight(1f)) {
-                            Text(app.appName, style = MaterialTheme.typography.titleMedium, color = TextPrimary)
-                            Text(app.packageName, style = MaterialTheme.typography.labelSmall, color = TextMuted)
+                            Text(app.appName, style = MaterialTheme.typography.titleMedium, color = palette.textPrimary)
+                            Text(app.packageName, style = MaterialTheme.typography.labelSmall, color = palette.textMuted)
                         }
                         Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                             if (app.isSideloaded) {
-                                NeonBadge(text = "SIDELOAD", color = AmberPulse)
+                                NeonBadge(text = "SIDELOAD", color = palette.amber)
                             }
                             NeonBadge(text = app.trustLevel, color = tColor)
                         }
@@ -422,20 +412,20 @@ private fun AppTrustAuditorTab(
                     Text(
                         text = "Installer: ${app.installerSource} • Updated: ${TimeFormatter.formatDateTime(app.lastUpdateTimeMs)}",
                         style = MaterialTheme.typography.labelSmall,
-                        color = TextSecondary
+                        color = palette.textSecondary
                     )
                     if (app.newlyAddedPermissions.isNotBlank()) {
                         Text(
                             text = "New Perms on Update: ${app.newlyAddedPermissions}",
                             style = MaterialTheme.typography.labelSmall,
-                            color = AlertCrimson
+                            color = palette.crimson
                         )
                     }
                     if (app.newlyAddedServices.isNotBlank()) {
                         Text(
                             text = "New Services on Update: ${app.newlyAddedServices}",
                             style = MaterialTheme.typography.labelSmall,
-                            color = AmberPulse
+                            color = palette.amber
                         )
                     }
                 }
@@ -452,23 +442,24 @@ private fun IntegrityAndSnapshotsTab(
     onShareReport: (ExportFormat) -> Unit,
     onSaveReportFile: (ExportFormat) -> Unit
 ) {
+    val palette = LocalJrsPalette.current
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         item {
-            GlassCard(accentBorder = CyberEmerald.copy(alpha = 0.45f)) {
+            GlassCard(accentBorder = palette.emerald.copy(alpha = 0.45f)) {
                 Text(
                     text = "System Integrity & Dual-Mode Safety Net",
                     style = MaterialTheme.typography.titleMedium,
-                    color = TextPrimary
+                    color = palette.textPrimary
                 )
                 Spacer(Modifier.height(4.dp))
                 Text(
                     text = "Score: ${integrityReport?.overallScore ?: "--"}/100 • Mode: ${integrityReport?.rootStatus?.mode?.title ?: "Detecting"}",
                     style = MaterialTheme.typography.bodySmall,
-                    color = NeonCyan
+                    color = palette.cyan
                 )
                 Spacer(Modifier.height(10.dp))
                 integrityReport?.checks?.forEach { check ->
@@ -482,34 +473,33 @@ private fun IntegrityAndSnapshotsTab(
                         Icon(
                             imageVector = if (check.passed) Icons.Rounded.CheckCircle else Icons.Rounded.Warning,
                             contentDescription = check.title,
-                            tint = if (check.passed) CyberEmerald else AmberPulse,
+                            tint = if (check.passed) palette.emerald else palette.amber,
                             modifier = Modifier.size(18.dp)
                         )
                         Column(modifier = Modifier.weight(1f)) {
-                            Text(check.title, style = MaterialTheme.typography.titleSmall, color = TextPrimary)
-                            Text(check.detail, style = MaterialTheme.typography.bodySmall, color = TextSecondary)
+                            Text(check.title, style = MaterialTheme.typography.titleSmall, color = palette.textPrimary)
+                            Text(check.detail, style = MaterialTheme.typography.bodySmall, color = palette.textSecondary)
                         }
                         NeonBadge(
                             text = check.statusLabel,
-                            color = if (check.passed) CyberEmerald else AmberPulse
+                            color = if (check.passed) palette.emerald else palette.amber
                         )
                     }
                 }
             }
         }
 
-        // Snapshot & Export Controls
         item {
-            GlassCard(accentBorder = NeonCyan.copy(alpha = 0.4f)) {
+            GlassCard(accentBorder = palette.cyan.copy(alpha = 0.4f)) {
                 Text(
                     text = "Suspicious Activity Snapshots & Export",
                     style = MaterialTheme.typography.titleMedium,
-                    color = TextPrimary
+                    color = palette.textPrimary
                 )
                 Text(
                     text = "Point-in-time system/network/permission snapshots are AES-256-GCM encrypted in local storage.",
                     style = MaterialTheme.typography.bodySmall,
-                    color = TextSecondary
+                    color = palette.textSecondary
                 )
                 Spacer(Modifier.height(10.dp))
                 Button(
@@ -518,7 +508,7 @@ private fun IntegrityAndSnapshotsTab(
                         .fillMaxWidth()
                         .heightIn(min = 48.dp)
                         .testTag("integrity_capture_snapshot"),
-                    colors = ButtonDefaults.buttonColors(containerColor = NeonCyan, contentColor = ObsidianVoid)
+                    colors = ButtonDefaults.buttonColors(containerColor = palette.cyan, contentColor = palette.onAccentButton)
                 ) {
                     Icon(Icons.Rounded.Security, contentDescription = null, modifier = Modifier.size(18.dp))
                     Spacer(Modifier.width(8.dp))
@@ -526,7 +516,7 @@ private fun IntegrityAndSnapshotsTab(
                 }
 
                 Spacer(Modifier.height(10.dp))
-                Text("Export / Share Audit Reports", style = MaterialTheme.typography.labelLarge, color = TextSecondary)
+                Text("Export / Share Audit Reports", style = MaterialTheme.typography.labelLarge, color = palette.textSecondary)
                 Spacer(Modifier.height(6.dp))
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -539,11 +529,11 @@ private fun IntegrityAndSnapshotsTab(
                                 .weight(1f)
                                 .heightIn(min = 48.dp)
                                 .testTag("export_save_${fmt.extension}"),
-                            border = BorderStroke(1.dp, NeonCyan.copy(alpha = 0.5f))
+                            border = BorderStroke(1.dp, palette.cyan.copy(alpha = 0.5f))
                         ) {
-                            Icon(Icons.Rounded.Download, contentDescription = null, tint = NeonCyan, modifier = Modifier.size(16.dp))
+                            Icon(Icons.Rounded.Download, contentDescription = null, tint = palette.cyan, modifier = Modifier.size(16.dp))
                             Spacer(Modifier.width(4.dp))
-                            Text(fmt.label, color = NeonCyan)
+                            Text(fmt.label, color = palette.cyan)
                         }
                     }
                 }
@@ -559,11 +549,11 @@ private fun IntegrityAndSnapshotsTab(
                                 .weight(1f)
                                 .heightIn(min = 48.dp)
                                 .testTag("export_share_${fmt.extension}"),
-                            border = BorderStroke(1.dp, CyberEmerald.copy(alpha = 0.5f))
+                            border = BorderStroke(1.dp, palette.emerald.copy(alpha = 0.5f))
                         ) {
-                            Icon(Icons.Rounded.Share, contentDescription = null, tint = CyberEmerald, modifier = Modifier.size(16.dp))
+                            Icon(Icons.Rounded.Share, contentDescription = null, tint = palette.emerald, modifier = Modifier.size(16.dp))
                             Spacer(Modifier.width(4.dp))
-                            Text("Share ${fmt.label}", color = CyberEmerald, style = MaterialTheme.typography.labelSmall)
+                            Text("Share ${fmt.label}", color = palette.emerald, style = MaterialTheme.typography.labelSmall)
                         }
                     }
                 }
@@ -574,7 +564,7 @@ private fun IntegrityAndSnapshotsTab(
             Text(
                 text = "Encrypted Security Snapshots (${snapshots.size})",
                 style = MaterialTheme.typography.titleMedium,
-                color = TextPrimary
+                color = palette.textPrimary
             )
         }
 
@@ -586,18 +576,18 @@ private fun IntegrityAndSnapshotsTab(
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text(snap.triggerReason, style = MaterialTheme.typography.titleSmall, color = TextPrimary, modifier = Modifier.weight(1f))
+                    Text(snap.triggerReason, style = MaterialTheme.typography.titleSmall, color = palette.textPrimary, modifier = Modifier.weight(1f))
                     NeonBadge(text = snap.severity, color = sevColor)
                 }
                 Spacer(Modifier.height(4.dp))
                 Text(
                     text = "${TimeFormatter.formatDateTime(snap.capturedAtMs)} • ${snap.operatingMode}",
                     style = MaterialTheme.typography.labelSmall,
-                    color = NeonCyan
+                    color = palette.cyan
                 )
-                Text(snap.resourceSummary, style = MaterialTheme.typography.bodySmall, color = TextSecondary)
-                Text(snap.permissionsSummary, style = MaterialTheme.typography.bodySmall, color = TextMuted)
-                Text(snap.networkSummary, style = MaterialTheme.typography.labelSmall, color = CyberEmerald)
+                Text(snap.resourceSummary, style = MaterialTheme.typography.bodySmall, color = palette.textSecondary)
+                Text(snap.permissionsSummary, style = MaterialTheme.typography.bodySmall, color = palette.textMuted)
+                Text(snap.networkSummary, style = MaterialTheme.typography.labelSmall, color = palette.emerald)
             }
         }
     }

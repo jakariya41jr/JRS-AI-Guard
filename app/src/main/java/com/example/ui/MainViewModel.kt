@@ -23,6 +23,7 @@ import com.example.data.local.TrustLevel
 import com.example.data.telemetry.IntegrityAuditReport
 import com.example.data.telemetry.MalwareScanUiResult
 import com.example.security.AiScheduleFrequency
+import com.example.security.AppThemeMode
 import com.example.security.GuardOperatingMode
 import com.example.security.VaultConfig
 import com.example.service.WatchdogForegroundService
@@ -32,6 +33,7 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
@@ -107,13 +109,18 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val _isCheckingRelease = MutableStateFlow(false)
     val isCheckingRelease: StateFlow<Boolean> = _isCheckingRelease.asStateFlow()
 
+    private val _showRootGrantAnimation = MutableStateFlow(false)
+    val showRootGrantAnimation: StateFlow<Boolean> = _showRootGrantAnimation.asStateFlow()
+
+    private var lastObservedMode: GuardOperatingMode? = null
+
     private val _uiEvents = MutableSharedFlow<UiToastEvent>()
     val uiEvents = _uiEvents.asSharedFlow()
 
     init {
         refreshAll()
         viewModelScope.launch {
-            val cfg = repo.vaultConfigFlow.stateIn(viewModelScope).value
+            val cfg = repo.vaultConfigFlow.first()
             if (cfg.watchdogEnabled) {
                 WatchdogForegroundService.start(getApplication())
             }
@@ -125,12 +132,75 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             _isScanningTelemetry.value = true
             runCatching {
                 val report = repo.refreshTelemetryAndIntegrity()
+                val prev = lastObservedMode
+                lastObservedMode = report.rootStatus.mode
                 _integrityReport.value = report
                 repo.checkOverlayWatchStatus()
+                if (report.rootStatus.mode == GuardOperatingMode.ROOTED_ACTIVE &&
+                    prev != GuardOperatingMode.ROOTED_ACTIVE
+                ) {
+                    _showRootGrantAnimation.value = true
+                }
             }.onFailure { err ->
                 _uiEvents.emit(UiToastEvent.Message("Telemetry refresh notice: ${err.message ?: "Partial read"}"))
             }
             _isScanningTelemetry.value = false
+        }
+    }
+
+    fun verifyAndActivateRoot() {
+        viewModelScope.launch {
+            _isScanningTelemetry.value = true
+            runCatching {
+                val status = repo.verifyRootAccess()
+                val report = repo.refreshTelemetryAndIntegrity()
+                _integrityReport.value = report
+                lastObservedMode = report.rootStatus.mode
+                if (status.mode == GuardOperatingMode.ROOTED_ACTIVE) {
+                    _showRootGrantAnimation.value = true
+                    _uiEvents.emit(
+                        UiToastEvent.Message(
+                            "Root access granted (${status.rootManagerName}) • Deep kernel watch active"
+                        )
+                    )
+                } else {
+                    _uiEvents.emit(
+                        UiToastEvent.Message(
+                            if (status.suBinaryFound || status.magiskOrKernelSuDetected) {
+                                "Root manager detected (${status.rootManagerName}), but SU permission was not granted."
+                            } else {
+                                "No root binary found — running cleanly in Non-Root Safety Net mode."
+                            }
+                        )
+                    )
+                }
+            }.onFailure {
+                _uiEvents.emit(UiToastEvent.Message("Root verification notice: ${it.message ?: "Unavailable"}"))
+            }
+            _isScanningTelemetry.value = false
+        }
+    }
+
+    fun dismissRootGrantAnimation() {
+        _showRootGrantAnimation.value = false
+    }
+
+    fun cycleThemeMode() {
+        viewModelScope.launch {
+            val current = vaultConfig.value.themeMode
+            val next = when (current) {
+                AppThemeMode.DARK -> AppThemeMode.LIGHT
+                AppThemeMode.LIGHT -> AppThemeMode.SYSTEM
+                AppThemeMode.SYSTEM -> AppThemeMode.DARK
+            }
+            repo.updateThemeMode(next)
+            _uiEvents.emit(UiToastEvent.Message("Theme switched to ${next.label} Mode"))
+        }
+    }
+
+    fun setThemeMode(mode: AppThemeMode) {
+        viewModelScope.launch {
+            repo.updateThemeMode(mode)
         }
     }
 
