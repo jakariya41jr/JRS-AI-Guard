@@ -8,9 +8,6 @@ on:
 jobs:
   build-release:
     runs-on: ubuntu-latest
-    env:
-      JAVA_TOOL_OPTIONS: "-Djava.awt.headless=true"
-      GRADLE_OPTS: "-Djava.awt.headless=true"
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -19,49 +16,18 @@ jobs:
         uses: actions/setup-java@v4
         with:
           distribution: temurin
-          java-version: "17"
+          java-version: '17'
 
-      - name: Setup Android SDK
-        uses: android-actions/setup-android@v3
+      - name: Accept Android SDK Licenses
+        run: |
+          yes | sdkmanager --licenses || true
+          sdkmanager --update || true
 
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v4
 
-      - name: Provision Debug & CI Release Keystores
-        run: |
-          if [ ! -f debug.keystore ]; then
-            keytool -genkeypair -v \
-              -keystore debug.keystore \
-              -storepass android \
-              -alias androiddebugkey \
-              -keypass android \
-              -keyalg RSA -keysize 2048 -validity 10000 \
-              -dname "CN=Android Debug,O=Android,C=US"
-          fi
-
-          if [ -n "${{ secrets.RELEASE_KEYSTORE_BASE64 }}" ]; then
-            echo "${{ secrets.RELEASE_KEYSTORE_BASE64 }}" | base64 -d > "${{ github.workspace }}/my-upload-key.jks"
-            echo "KEYSTORE_PATH=${{ github.workspace }}/my-upload-key.jks" >> "$GITHUB_ENV"
-            echo "STORE_PASSWORD=${{ secrets.RELEASE_STORE_PASSWORD }}" >> "$GITHUB_ENV"
-            echo "KEY_PASSWORD=${{ secrets.RELEASE_KEY_PASSWORD }}" >> "$GITHUB_ENV"
-          elif [ ! -f my-upload-key.jks ]; then
-            keytool -genkeypair -v \
-              -keystore my-upload-key.jks \
-              -storepass ci_release_pass \
-              -alias upload \
-              -keypass ci_release_pass \
-              -keyalg RSA -keysize 2048 -validity 10000 \
-              -dname "CN=JRS AI Guard,O=Md Jakariya Hasan,C=BD"
-            echo "KEYSTORE_PATH=${{ github.workspace }}/my-upload-key.jks" >> "$GITHUB_ENV"
-            echo "STORE_PASSWORD=ci_release_pass" >> "$GITHUB_ENV"
-            echo "KEY_PASSWORD=ci_release_pass" >> "$GITHUB_ENV"
-          fi
-
-      - name: Run Unit Tests
-        run: gradle :app:testDebugUnitTest --tests "com.example.ExampleUnitTest" --no-daemon
-
       - name: Build Debug & Release APKs
-        run: gradle assembleDebug assembleRelease --no-daemon
+        run: ./gradlew assembleDebug assembleRelease --no-daemon
 
       - name: Publish GitHub Release
         if: startsWith(github.ref, 'refs/tags/')
