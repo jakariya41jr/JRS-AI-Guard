@@ -146,6 +146,21 @@ dependencies {
   // "ksp"(libs.moshi.kotlin.codegen)
 }
 
+abstract class KspSerialExecutionService :
+  org.gradle.api.services.BuildService<org.gradle.api.services.BuildServiceParameters.None>
+
+val kspSerialExecutionService =
+  gradle.sharedServices.registerIfAbsent(
+    "kspSerialExecution",
+    KspSerialExecutionService::class.java,
+  ) {
+    maxParallelUsages.set(1)
+  }
+
+tasks.withType(com.google.devtools.ksp.gradle.KspAATask::class.java).configureEach {
+  usesService(kspSerialExecutionService)
+}
+
 tasks.matching { it.name == "validateSigningDebug" }.configureEach {
   val debugKeystore = rootProject.file("debug.keystore")
   doFirst {
