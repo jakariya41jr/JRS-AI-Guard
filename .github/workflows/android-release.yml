@@ -1,12 +1,16 @@
-name: Android Debug APK
+name: Android Debug APK Release
 
 on:
   push:
-    branches: [ main ]
+    tags:
+      - 'v*'
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
-  build-debug:
+  build-and-release-debug:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
@@ -29,10 +33,14 @@ jobs:
       - name: Build Debug APK
         run: gradle assembleDebug --no-daemon --stacktrace
 
-      - name: Upload Debug APK Artifact
-        if: always()
-        uses: actions/upload-artifact@v4
+      - name: Prepare Debug APK for Release
+        run: |
+          mkdir -p release-assets
+          cp app/build/outputs/apk/debug/*.apk release-assets/
+
+      - name: Publish Debug APK Release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
         with:
-          name: jrs-ai-guard-debug-apk
-          path: app/build/outputs/apk/debug/*.apk
-          if-no-files-found: ignore
+          files: release-assets/*.apk
+          generate_release_notes: true
